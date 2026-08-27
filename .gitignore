@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Engram AI agent memory
+.engram/
