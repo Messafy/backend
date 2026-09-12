@@ -34,3 +34,13 @@ build/
 
 # Engram AI agent memory
 .engram/
+
+### Secrets and local environment ###
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+

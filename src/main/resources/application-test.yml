@@ -1,0 +1,29 @@
+spring:
+  mvc:
+    log-request-details: true
+  config:
+    activate:
+      on-profile: test
+  data:
+    mongodb:
+      auto-index-creation: false
+  output:
+    ansi:
+      enabled: NEVER
+  mongodb:
+    database: test-privatenotes
+logging:
+  level:
+    root: WARN
+    com.luispiquinrey.backend: INFO
+
+security:
+  user:
+    password: ${USER_TEST_PASSWORD:test}
+    username: ${USER_TEST_USERNAME:{noop}luispiquinrey}
+
+de:
+  flapdoodle:
+    mongodb:
+      embedded:
+        version: 7.0.14
