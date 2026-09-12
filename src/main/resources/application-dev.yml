@@ -1,24 +1,19 @@
 spring:
   config:
-    import: optional:classpath:.env[.properties]
-  main:
-    log-startup-info: true
-  application:
-    name: backend
+    activate:
+      on-profile: dev
   data:
     mongodb:
       auto-index-creation: true
   mongodb:
+    uri: ${MONGO_URI}
     database: privatenotes
   output:
     ansi:
       enabled: ALWAYS
-server:
-  port: 8080
-security:
-  jwt:
-    secret: ${JWT_SECRET:9f3c6e2a7b4d8f1c5a0e9d3b7c6f2a1e8d4b9c0f7a5e3d2c1b6f8a4e9d7c2b5}
 logging:
   level:
+    root: INFO
+    com.luispiquinrey.backend: DEBUG
     org.springframework.data.mongodb.core.MongoTemplate: DEBUG
     org.springframework.web: DEBUG
