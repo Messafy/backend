@@ -1,10 +1,10 @@
-package com.luispiquinrey.backend2;
+package com.luispiquinrey.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class Backend2ApplicationTests {
+class BackendApplicationTests {
 
     @Test
     void contextLoads() {
