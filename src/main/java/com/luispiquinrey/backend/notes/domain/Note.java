@@ -94,6 +94,8 @@ public abstract class Note {
         return content;
     }
 
+    public abstract boolean isOwnedBy(String ownerId);
+
     public void changeContent(String content) {
         this.content = new Content(content);
     }

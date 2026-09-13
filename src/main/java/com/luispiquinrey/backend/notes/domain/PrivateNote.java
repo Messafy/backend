@@ -32,6 +32,7 @@ public class PrivateNote extends Note {
         return ownerId;
     }
 
+    @Override
     public boolean isOwnedBy(String ownerId) {
         return this.ownerId.equals(new UserId(ownerId));
     }
