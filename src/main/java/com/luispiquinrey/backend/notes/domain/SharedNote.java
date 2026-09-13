@@ -40,6 +40,7 @@ public class SharedNote extends Note {
         return sharedWith;
     }
 
+    @Override
     public boolean isOwnedBy(String ownerId) {
         return this.ownerId.equals(new UserId(ownerId));
     }

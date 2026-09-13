@@ -43,7 +43,10 @@ class DeleteNoteServiceTest {
         when(repository.findById(new NoteId("507f1f77bcf86cd799439011")))
                 .thenReturn(Optional.of(note));
 
-        service.delete("507f1f77bcf86cd799439011");
+        service.delete(
+                "507f1f77bcf86cd799439011",
+                "507f1f77bcf86cd799439012"
+        );
 
         assertEquals(NoteStatus.DELETED, note.status());
         verify(repository).save(note);
@@ -58,7 +61,10 @@ class DeleteNoteServiceTest {
 
         assertThrows(
                 NoteNotFoundException.class,
-                () -> service.delete("507f1f77bcf86cd799439011")
+                () -> service.delete(
+                        "507f1f77bcf86cd799439011",
+                        "507f1f77bcf86cd799439012"
+                )
         );
         verify(repository, never()).save(new NoteFactory().createPrivateNote(
                 "507f1f77bcf86cd799439011", "Hello", "Body", "507f1f77bcf86cd799439012"));

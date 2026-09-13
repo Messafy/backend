@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -31,5 +32,11 @@ public class NoteExceptionHandler {
     public ProblemDetail handleConflict(NoteConflictException ex) {
         log.warn("Request failed because the note state does not allow the operation: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Request failed because access to the note was denied: {}", ex.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 }
