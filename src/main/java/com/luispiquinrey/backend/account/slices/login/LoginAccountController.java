@@ -22,9 +22,11 @@ public class LoginAccountController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AccountLoginResponse> login(@Valid @RequestBody AccountLoginRequest request) {
-        log.info("Received login attempt for {}", request == null ? "unknown" : request.email());
-        AccountLoginResponse response = loginAccountService.login(request);
+    public ResponseEntity<AccountLoginResponse> login(
+            @Valid @RequestBody AccountLoginRequest request) {
+        log.info("Received login attempt for {}", request.email());
+        AccountLoginResponse response =
+                loginAccountService.login(request);
         log.info("Login successful for {}", request.email());
         return ResponseEntity.ok(response);
     }
