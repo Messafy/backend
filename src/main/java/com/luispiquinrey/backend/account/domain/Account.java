@@ -5,8 +5,10 @@ import org.jmolecules.ddd.annotation.AggregateRoot;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
 
+import java.io.Serializable;
+
 @AggregateRoot
-public class Account {
+public class Account implements Serializable {
     private UserId id;
     private Email email;
     private EncodedPassword encodedPassword;

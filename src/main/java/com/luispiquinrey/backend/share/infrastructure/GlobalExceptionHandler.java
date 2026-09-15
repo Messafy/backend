@@ -11,35 +11,51 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private LocalDateTime userTime() {
+        return LocalDateTime.now(ZoneId.systemDefault());
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationError(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, Object>> handleValidationError(
+            MethodArgumentNotValidException ex) {
+
         Map<String, Object> errors = new LinkedHashMap<>();
-        errors.put("timestamp", LocalDateTime.now());
+        errors.put("timestamp", userTime());
         errors.put("status", HttpStatus.BAD_REQUEST.value());
-        errors.put("errors", ex.getBindingResult().getFieldErrors()
+        errors.put("errors", ex.getBindingResult()
+                .getFieldErrors()
                 .stream()
-                .map(err -> Map.of("field", err.getField(), "message", err.getDefaultMessage()))
+                .map(err -> Map.of(
+                        "field", err.getField(),
+                        "message", err.getDefaultMessage()
+                ))
                 .toList());
         log.warn("Request failed because of validation errors: {}", errors);
         return ResponseEntity.badRequest().body(errors);
     }
-
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(
+            ConstraintViolationException ex) {
+
         Map<String, Object> errors = new LinkedHashMap<>();
-        errors.put("timestamp", LocalDateTime.now());
+        errors.put("timestamp", userTime());
         errors.put("status", HttpStatus.BAD_REQUEST.value());
         errors.put("errors", ex.getConstraintViolations()
                 .stream()
-                .map(v -> Map.of("field", v.getPropertyPath().toString(), "message", v.getMessage()))
+                .map(v -> Map.of(
+                        "field", v.getPropertyPath().toString(),
+                        "message", v.getMessage()
+                ))
                 .toList());
         log.warn("Request failed because of constraint violations: {}", errors);
         return ResponseEntity.badRequest().body(errors);
@@ -47,13 +63,28 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("Request failed because an argument was invalid: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        log.warn(
+                "Request failed because an argument was invalid: {}",
+                ex.getMessage()
+        );
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                ex.getMessage()
+        );
+        problem.setProperty("timestamp", userTime());
+        return problem;
     }
-
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
-        log.warn("Request failed because the current state is invalid: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        log.warn(
+                "Request failed because the current state is invalid: {}",
+                ex.getMessage()
+        );
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                ex.getMessage()
+        );
+        problem.setProperty("timestamp", userTime());
+        return problem;
     }
 }

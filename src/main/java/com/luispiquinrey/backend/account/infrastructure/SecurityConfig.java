@@ -24,6 +24,9 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_USER = "USER";
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -35,7 +38,11 @@ public class SecurityConfig {
             UserDetailsService userDetailsService,
             HandlerExceptionResolver handlerExceptionResolver
     ) {
-        return new JwtAuthenticationFilter(jwtTokenVerifier, userDetailsService, handlerExceptionResolver);
+        return new JwtAuthenticationFilter(
+                jwtTokenVerifier,
+                userDetailsService,
+                handlerExceptionResolver
+        );
     }
 
     @Bean
@@ -43,6 +50,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter
     ) throws Exception {
+
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -52,29 +60,32 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/v1/auth/**").permitAll()
+                        .requestMatchers("/v1/auth/**")
+                        .permitAll()
 
-                        .requestMatchers("/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/v1/admin/**")
+                        .hasRole(ROLE_ADMIN)
 
                         .requestMatchers(HttpMethod.GET, "/v1/accounts/me")
-                        .hasAnyRole("USER", "ADMIN")
+                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
 
                         .requestMatchers("/v1/accounts/**")
-                        .hasRole("ADMIN")
+                        .hasRole(ROLE_ADMIN)
 
                         .requestMatchers(HttpMethod.POST, "/v1/notes")
-                        .hasAnyRole("USER", "ADMIN")
+                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
 
                         .requestMatchers(HttpMethod.GET, "/v1/notes/**")
-                        .hasAnyRole("USER", "ADMIN")
+                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
 
                         .requestMatchers(HttpMethod.PATCH, "/v1/notes/**")
-                        .hasAnyRole("USER", "ADMIN")
+                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
 
                         .requestMatchers(HttpMethod.DELETE, "/v1/notes/**")
-                        .hasAnyRole("USER", "ADMIN")
+                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
 
-                        .anyRequest().authenticated()
+                        .anyRequest()
+                        .authenticated()
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,
@@ -86,9 +97,15 @@ public class SecurityConfig {
     private CorsConfigurationSource corsConfigurationSource() {
         return request -> {
             CorsConfiguration corsConfiguration = new CorsConfiguration();
-            corsConfiguration.setAllowedOrigins(List.of("http://localhost:5173"));
-            corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
-            corsConfiguration.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+            corsConfiguration.setAllowedOrigins(
+                    List.of("http://localhost:5173")
+            );
+            corsConfiguration.setAllowedMethods(
+                    List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS")
+            );
+            corsConfiguration.setAllowedHeaders(
+                    List.of("Content-Type", "Authorization")
+            );
             corsConfiguration.setAllowCredentials(true);
             return corsConfiguration;
         };

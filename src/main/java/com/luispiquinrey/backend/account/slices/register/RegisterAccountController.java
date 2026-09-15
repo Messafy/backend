@@ -25,8 +25,9 @@ public class RegisterAccountController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<AccountRegisterResponse> register(@Valid @RequestBody AccountRegisterRequest request) {
-        log.info("Received registration request for {}", request == null ? "unknown" : request.email());
+    public ResponseEntity<AccountRegisterResponse> register(
+            @Valid @RequestBody AccountRegisterRequest request) {
+        log.info("Received registration request for {}", request.email());
         AccountRegisterResponse response = registerAccountService.register(request);
         log.info("Created account {}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

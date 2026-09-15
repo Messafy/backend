@@ -26,10 +26,6 @@ public class RegisterAccountService {
     }
 
     public AccountRegisterResponse register(AccountRegisterRequest request) {
-        if (request == null) {
-            log.warn("Registration rejected because request body is missing");
-            throw new IllegalArgumentException("request body cannot be null");
-        }
         if (request.rawPassword() == null || request.rawPassword().isBlank()) {
             log.warn("Registration rejected for {} because password is missing", request.email());
             throw new IllegalArgumentException("raw password cannot be blank");

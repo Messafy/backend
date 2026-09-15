@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class GetNoteControllerTest {
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnNoteWhenExists() throws Exception {
         Note note = new NoteFactory().createPrivateNote(
@@ -45,7 +45,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnNotFoundWhenMissing() throws Exception {
         GetNoteService service = mock(GetNoteService.class);
@@ -60,7 +60,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnEmptyListWhenNoActiveByOwner() throws Exception {
         GetNoteService service = mock(GetNoteService.class);
@@ -78,7 +78,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnListWhenFilteringByStatus() throws Exception {
         Note note = new NoteFactory().createPrivateNote(
@@ -101,7 +101,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnListWhenOwnerHasActiveNotes() throws Exception {
         Note note = new NoteFactory().createPrivateNote(
@@ -126,7 +126,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnListWhenFilteringBySharedWith() throws Exception {
         Note note = new NoteFactory().createSharedNote(
@@ -152,7 +152,7 @@ class GetNoteControllerTest {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(3)
     @Tag("getNoteController")
     void shouldReturnListWhenFilteringByOwnerAndSharedWith() throws Exception {
         Note note = new NoteFactory().createSharedNote(

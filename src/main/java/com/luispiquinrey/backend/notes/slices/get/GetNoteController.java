@@ -34,14 +34,22 @@ public class GetNoteController {
 
     @GetMapping("/{id}")
     public ResponseEntity<NoteGetResponse> getById(@PathVariable String id) {
-        log.info("Received request to get note {}", id);
+        String safeId = sanitizeForLog(id);
+        log.info("Received request to get note {}", safeId);
         Optional<Note> note = service.findById(id);
         if (note.isEmpty()) {
-            log.info("Note {} was not found", id);
+            log.info("Note {} was not found", safeId);
         }
         return note
                 .map(found -> ResponseEntity.ok(NoteGetResponse.from(found)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private String sanitizeForLog(String value) {
+        return value == null
+                ? "null"
+                : value.replace("\n", "_")
+                .replace("\r", "_");
     }
 
     @GetMapping(params = "status")
