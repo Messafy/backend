@@ -14,10 +14,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,17 +41,20 @@ class CreateNoteServiceTest {
                 NoteCreationRequest.NoteType.PRIVATE,
                 "Hello",
                 "Body",
-                "507f1f77bcf86cd799439012",
-                null
+                null,
+                List.of("work", "urgent")
         );
 
-        Note note = service.createNote(dto);
+        Note note = service.createNote(dto, "507f1f77bcf86cd799439012");
 
         assertInstanceOf(PrivateNote.class, note);
         assertNotNull(note.id());
         assertEquals("Hello", note.title().title());
         assertEquals("Body", note.content().content());
         assertEquals(NoteStatus.NEW, note.status());
+        assertEquals(List.of("work", "urgent"), note.tags().stream().map(com.luispiquinrey.backend.notes.domain.Tag::tag).toList());
+        assertTrue(note.isOwnedBy("507f1f77bcf86cd799439012"));
+        assertFalse(note.isOwnedBy("507f1f77bcf86cd799439013"));
 
         ArgumentCaptor<Note> captor = ArgumentCaptor.forClass(Note.class);
         verify(repository).save(captor.capture());
@@ -62,11 +69,10 @@ class CreateNoteServiceTest {
                 NoteCreationRequest.NoteType.SHARED,
                 "Hello",
                 "Body",
-                "507f1f77bcf86cd799439012",
                 "507f1f77bcf86cd799439013"
         );
 
-        Note note = service.createNote(dto);
+        Note note = service.createNote(dto, "507f1f77bcf86cd799439012");
 
         assertInstanceOf(SharedNote.class, note);
         verify(repository).save(note);
@@ -76,7 +82,10 @@ class CreateNoteServiceTest {
     @Timeout(1)
     @Tag("createNoteService")
     void shouldThrowWhenDtoIsNull() {
-        assertThrows(NoteValidationException.class, () -> service.createNote(null));
+        assertThrows(
+                NoteValidationException.class,
+                () -> service.createNote(null, "507f1f77bcf86cd799439012")
+        );
     }
 
     @Test
@@ -87,10 +96,12 @@ class CreateNoteServiceTest {
                 null,
                 "Hello",
                 "Body",
-                "507f1f77bcf86cd799439012",
                 null
         );
 
-        assertThrows(NoteValidationException.class, () -> service.createNote(dto));
+        assertThrows(
+                NoteValidationException.class,
+                () -> service.createNote(dto, "507f1f77bcf86cd799439012")
+        );
     }
 }

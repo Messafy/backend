@@ -1,5 +1,7 @@
 package com.luispiquinrey.backend.notes.infrastructure;
 
+import java.util.List;
+
 import org.springframework.data.annotation.TypeAlias;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -26,6 +28,24 @@ public class SharedNoteDocument extends NoteDocument {
             String sharedWith
     ) {
         super(id, title, content, status, createdAt, readAt, hiddenAt, reportedAt);
+        this.ownerId = ownerId;
+        this.sharedWith = sharedWith;
+    }
+
+    public SharedNoteDocument(
+            String id,
+            String title,
+            String content,
+            String status,
+            String createdAt,
+            String readAt,
+            String hiddenAt,
+            String reportedAt,
+            List<String> tags,
+            String ownerId,
+            String sharedWith
+    ) {
+        super(id, title, content, status, createdAt, readAt, hiddenAt, reportedAt, tags);
         this.ownerId = ownerId;
         this.sharedWith = sharedWith;
     }

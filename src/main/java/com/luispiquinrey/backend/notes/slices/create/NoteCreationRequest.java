@@ -5,6 +5,8 @@ import com.luispiquinrey.backend.notes.slices.create.validation.NoInvalidControl
 import com.luispiquinrey.backend.notes.slices.create.validation.NoUrls;
 import jakarta.validation.constraints.*;
 
+import java.util.List;
+
 public record NoteCreationRequest(
         NoteType type,
         @NotNull(message = "Title cannot be null")
@@ -21,19 +23,18 @@ public record NoteCreationRequest(
         @NoUrls(message = "Content cannot contain URLs")
         @NoInvalidControlCharacters(message = "Content cannot contain invalid control characters")
         String content,
-        @NotNull(message = "Owner ID cannot be null")
-        @NotEmpty(message = "Owner ID cannot be empty")
-        @Pattern(
-                regexp = "^[a-fA-F0-9]{24}$",
-                message = "Owner ID must be a valid 24-character hexadecimal ObjectId"
-        ) String ownerId,
         @NotNull(message = "Shared-with ID cannot be null")
         @NotEmpty(message = "Shared-with ID cannot be empty")
         @Pattern(
                 regexp = "^[a-fA-F0-9]{24}$",
                 message = "Shared-with ID must be a valid 24-character hexadecimal ObjectId"
-        ) String sharedWith
+        ) String sharedWith,
+        List<String> tags
 ) {
+    public NoteCreationRequest(NoteType type, String title, String content, String sharedWith) {
+        this(type, title, content, sharedWith, null);
+    }
+
     public enum NoteType {
         PRIVATE,
         SHARED

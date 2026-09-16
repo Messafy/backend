@@ -1,5 +1,8 @@
 package com.luispiquinrey.backend.notes.infrastructure;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
@@ -20,10 +23,16 @@ public abstract class NoteDocument {
     private String readAt;
     private String hiddenAt;
     private String reportedAt;
+    private List<String> tags;
+    private Boolean pinned;
 
     public NoteDocument() {}
 
     public NoteDocument(String id, String title, String content, String status, String createdAt, String readAt, String hiddenAt, String reportedAt) {
+        this(id, title, content, status, createdAt, readAt, hiddenAt, reportedAt, null);
+    }
+
+    public NoteDocument(String id, String title, String content, String status, String createdAt, String readAt, String hiddenAt, String reportedAt, List<String> tags) {
         this.id = new ObjectId(id);
         this.title = title;
         this.content = content;
@@ -32,6 +41,7 @@ public abstract class NoteDocument {
         this.readAt = readAt;
         this.hiddenAt = hiddenAt;
         this.reportedAt = reportedAt;
+        this.tags = tags == null ? null : new ArrayList<>(tags);
     }
 
     public ObjectId getId() {
@@ -104,5 +114,21 @@ public abstract class NoteDocument {
 
     public void setReportedAt(String reportedAt) {
         this.reportedAt = reportedAt;
+    }
+
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
+    public boolean isPinned() {
+        return Boolean.TRUE.equals(pinned);
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
     }
 }

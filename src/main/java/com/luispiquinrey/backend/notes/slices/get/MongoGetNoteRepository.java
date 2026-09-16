@@ -12,10 +12,13 @@ import com.luispiquinrey.backend.notes.infrastructure.PrivateNoteDocument;
 import com.luispiquinrey.backend.notes.infrastructure.SharedNoteDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.bson.types.ObjectId;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -63,13 +66,17 @@ public class MongoGetNoteRepository implements GetNoteRepository {
     @Override
     public List<Note> findActiveByOwner(String ownerId) {
         log.debug("Querying MongoDB for active notes owned by or shared with {}", ownerId);
+        List<String> visibleStatuses = List.of(NoteStatus.NEW.name(), NoteStatus.READ.name());
         List<NoteDocument> documents = new ArrayList<>();
-        documents.addAll(privateRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.NEW.name()));
-        documents.addAll(sharedRepository.findAllByStatusAndSharedWith(
-                NoteStatus.NEW.name(),
+        documents.addAll(privateRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
+        documents.addAll(sharedRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
+        documents.addAll(sharedRepository.findAllByStatusInAndSharedWith(
+                visibleStatuses,
                 ownerId
         ));
-        List<Note> notes = documents.stream().map(mapper::toDomain).toList();
+        Map<ObjectId, NoteDocument> uniqueDocuments = new LinkedHashMap<>();
+        documents.forEach(document -> uniqueDocuments.putIfAbsent(document.getId(), document));
+        List<Note> notes = uniqueDocuments.values().stream().map(mapper::toDomain).toList();
         log.debug("MongoDB returned {} active notes for owner {}", notes.size(), ownerId);
         return notes;
     }
@@ -95,6 +102,14 @@ public class MongoGetNoteRepository implements GetNoteRepository {
         ).stream().map(mapper::toDomain).toList();
         log.debug("MongoDB returned {} active notes owned by {} and shared with {}", notes.size(), ownerId, sharedWith);
         return notes;
+    }
+
+    @Override
+    public List<Note> findDeletedByOwner(String ownerId) {
+        List<NoteDocument> documents = new ArrayList<>();
+        documents.addAll(privateRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
+        documents.addAll(sharedRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
+        return documents.stream().map(mapper::toDomain).toList();
     }
 
     List<PrivateNoteDocument> findPrivateByOwner(String ownerId) {

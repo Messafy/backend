@@ -110,9 +110,10 @@ class MongoGetNoteRepositoryTest {
         Note privateNote = privateNote("507f1f77bcf86cd799439011");
         Note sharedNote = sharedNote();
 
-        when(privateRepository.findAllByOwnerIdAndStatus("507f1f77bcf86cd799439012", "NEW"))
+        List<String> visibleStatuses = List.of("NEW", "READ");
+        when(privateRepository.findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses))
                 .thenReturn(List.of(privateDocument));
-        when(sharedRepository.findAllByStatusAndSharedWith("NEW", "507f1f77bcf86cd799439012"))
+        when(sharedRepository.findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses))
                 .thenReturn(List.of(sharedDocument));
         when(mapper.toDomain(privateDocument)).thenReturn(privateNote);
         when(mapper.toDomain(sharedDocument)).thenReturn(sharedNote);
@@ -120,8 +121,9 @@ class MongoGetNoteRepositoryTest {
         List<Note> result = repository.findActiveByOwner("507f1f77bcf86cd799439012");
 
         assertEquals(List.of(privateNote, sharedNote), result);
-        verify(privateRepository).findAllByOwnerIdAndStatus("507f1f77bcf86cd799439012", "NEW");
-        verify(sharedRepository).findAllByStatusAndSharedWith("NEW", "507f1f77bcf86cd799439012");
+        verify(privateRepository).findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses);
+        verify(sharedRepository).findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses);
+        verify(sharedRepository).findAllByStatusInAndSharedWith(visibleStatuses, "507f1f77bcf86cd799439012");
     }
 
     @Test

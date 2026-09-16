@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.notes.infrastructure;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 import org.bson.types.ObjectId;
@@ -14,6 +15,7 @@ import com.luispiquinrey.backend.notes.domain.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.NoteStatus;
 import com.luispiquinrey.backend.notes.domain.PrivateNote;
 import com.luispiquinrey.backend.notes.domain.SharedNote;
+import com.luispiquinrey.backend.notes.domain.Tag;
 import com.luispiquinrey.backend.share.time.Date;
 
 @Primary
@@ -71,7 +73,9 @@ public class NoteMapper {
                 toNoteDate(document.getReadAt()),
                 toNoteDate(document.getHiddenAt()),
                 toNoteDate(document.getReportedAt()),
-                document.getOwnerId()
+                document.getOwnerId(),
+                toDomainTags(document.getTags()),
+                document.isPinned()
         );
     }
 
@@ -86,12 +90,14 @@ public class NoteMapper {
                 toNoteDate(document.getHiddenAt()),
                 toNoteDate(document.getReportedAt()),
                 document.getOwnerId(),
-                document.getSharedWith()
+                document.getSharedWith(),
+                toDomainTags(document.getTags()),
+                document.isPinned()
         );
     }
 
     private PrivateNoteDocument toPrivateDocument(PrivateNote note) {
-        return new PrivateNoteDocument(
+        PrivateNoteDocument document = new PrivateNoteDocument(
                 note.id().id(),
                 note.title().title(),
                 note.content().content(),
@@ -100,12 +106,15 @@ public class NoteMapper {
                 note.readAt() == null ? null : note.readAt().value().toString(),
                 note.hiddenAt() == null ? null : note.hiddenAt().value().toString(),
                 note.reportedAt() == null ? null : note.reportedAt().value().toString(),
+                toDocumentTags(note.tags()),
                 note.ownerId().id()
         );
+        document.setPinned(note.pinned());
+        return document;
     }
 
     private SharedNoteDocument toSharedDocument(SharedNote note) {
-        return new SharedNoteDocument(
+        SharedNoteDocument document = new SharedNoteDocument(
                 note.id().id(),
                 note.title().title(),
                 note.content().content(),
@@ -114,12 +123,23 @@ public class NoteMapper {
                 note.readAt() == null ? null : note.readAt().value().toString(),
                 note.hiddenAt() == null ? null : note.hiddenAt().value().toString(),
                 note.reportedAt() == null ? null : note.reportedAt().value().toString(),
+                toDocumentTags(note.tags()),
                 note.ownerId().id(),
                 note.sharedWith().ownerId().id()
         );
+        document.setPinned(note.pinned());
+        return document;
     }
 
     private Date toNoteDate(String date) {
         return date == null ? null : new Date(Instant.parse(date));
+    }
+
+    private List<Tag> toDomainTags(List<String> tags) {
+        return tags == null ? List.of() : tags.stream().map(Tag::new).toList();
+    }
+
+    private List<String> toDocumentTags(List<Tag> tags) {
+        return tags.stream().map(Tag::tag).toList();
     }
 }

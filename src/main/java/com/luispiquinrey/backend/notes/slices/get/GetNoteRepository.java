@@ -19,4 +19,6 @@ public interface GetNoteRepository {
     List<Note> findActiveBySharedWith(String sharedWith);
 
     List<Note> findActiveByOwnerAndSharedWith(String ownerId, String sharedWith);
+
+    List<Note> findDeletedByOwner(String ownerId);
 }

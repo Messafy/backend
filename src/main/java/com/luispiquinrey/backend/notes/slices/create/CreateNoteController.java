@@ -1,11 +1,13 @@
 package com.luispiquinrey.backend.notes.slices.create;
 
 import com.luispiquinrey.backend.notes.domain.Note;
+import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -24,9 +26,12 @@ public class CreateNoteController {
 
     @PostMapping
     @ResponseStatus(value = HttpStatus.CREATED)
-    public ResponseEntity<NoteCreationResponse> createNote(@Valid @RequestBody NoteCreationRequest noteCreationRequest) {
+    public ResponseEntity<NoteCreationResponse> createNote(
+            @Valid @RequestBody NoteCreationRequest noteCreationRequest,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+    ) {
         log.info("Received request to create a {} note", noteCreationRequest == null ? "unknown" : noteCreationRequest.type());
-        Note note = createNoteService.createNote(noteCreationRequest);
+        Note note = createNoteService.createNote(noteCreationRequest, authenticatedUser.accountId());
         URI location = URI.create("/v1/notes/" + note.id().id());
         log.info("Created note {} and returning location {}", note.id().id(), location);
 

@@ -8,6 +8,7 @@ import com.luispiquinrey.backend.notes.domain.SharedNote;
 import org.junit.jupiter.api.*;
 
 import java.time.Instant;
+import java.util.List;
 
 public class NoteMapperTest {
 
@@ -27,6 +28,7 @@ public class NoteMapperTest {
                 null,
                 null,
                 null,
+                List.of("work", "urgent"),
                 "507f1f77bcf86cd799439012"
         );
         document.setVersion(1);
@@ -43,6 +45,7 @@ public class NoteMapperTest {
         Assertions.assertEquals("Body of the note", note.content()
                 .content());
         Assertions.assertEquals(NoteStatus.NEW, note.status());
+        Assertions.assertEquals(List.of("work", "urgent"), note.tags().stream().map(com.luispiquinrey.backend.notes.domain.Tag::tag).toList());
         Assertions.assertNotNull(note.createdAt());
         Assertions.assertNull(note.readAt());
         Assertions.assertNull(note.hiddenAt());
@@ -63,7 +66,8 @@ public class NoteMapperTest {
                 "507f1f77bcf86cd799439011",
                 "Hello private",
                 "Body of the private note",
-                "507f1f77bcf86cd799439012"
+                "507f1f77bcf86cd799439012",
+                List.of(new com.luispiquinrey.backend.notes.domain.Tag("private"))
         );
 
         SharedNote sharedNote = noteFactory.createSharedNote(
@@ -71,7 +75,8 @@ public class NoteMapperTest {
                 "Hello shared",
                 "Body of the shared note",
                 "507f1f77bcf86cd799439014",
-                "507f1f77bcf86cd799439015"
+                "507f1f77bcf86cd799439015",
+                List.of(new com.luispiquinrey.backend.notes.domain.Tag("shared"))
         );
 
         NoteMapper mapper = new NoteMapper();
@@ -89,6 +94,7 @@ public class NoteMapperTest {
         Assertions.assertNull(privateDocument.getReadAt());
         Assertions.assertNull(privateDocument.getHiddenAt());
         Assertions.assertNull(privateDocument.getReportedAt());
+        Assertions.assertEquals(List.of("private"), privateDocument.getTags());
         Assertions.assertEquals(
                 "507f1f77bcf86cd799439012",
                 ((PrivateNoteDocument) privateDocument).getOwnerId()
@@ -104,6 +110,7 @@ public class NoteMapperTest {
         Assertions.assertNull(sharedDocument.getReadAt());
         Assertions.assertNull(sharedDocument.getHiddenAt());
         Assertions.assertNull(sharedDocument.getReportedAt());
+        Assertions.assertEquals(List.of("shared"), sharedDocument.getTags());
         Assertions.assertEquals(
                 "507f1f77bcf86cd799439014",
                 ((SharedNoteDocument) sharedDocument).getOwnerId()
@@ -118,7 +125,12 @@ public class NoteMapperTest {
     @Timeout(1)
     @Tag("noteMapper")
     void shouldThrowWhenDomainTypeIsUnknown() {
-        Note unknownNote = new Note() {};
+        Note unknownNote = new Note() {
+            @Override
+            public boolean isOwnedBy(String ownerId) {
+                return false;
+            }
+        };
         NoteMapper mapper = new NoteMapper();
 
         Assertions.assertThrows(
