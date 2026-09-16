@@ -58,4 +58,8 @@ public class GetNoteService {
         log.debug("Found {} active notes owned by {} and shared with {}", notes.size(), ownerId, sharedWith);
         return notes;
     }
+
+    public List<Note> findDeletedByOwner(String ownerId) {
+        return repository.findDeletedByOwner(ownerId);
+    }
 }

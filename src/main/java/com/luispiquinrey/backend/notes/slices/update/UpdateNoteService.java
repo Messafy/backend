@@ -4,6 +4,7 @@ import com.luispiquinrey.backend.notes.domain.Note;
 import com.luispiquinrey.backend.notes.domain.NoteId;
 import com.luispiquinrey.backend.notes.domain.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.NoteValidationException;
+import com.luispiquinrey.backend.notes.domain.Tag;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,9 @@ public class UpdateNoteService {
 
         note.rename(request.title());
         note.changeContent(request.content());
+        if (request.tags() != null) {
+            note.replaceTags(request.tags().stream().map(Tag::new).toList());
+        }
         repository.save(note);
         return note;
     }

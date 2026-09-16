@@ -4,9 +4,11 @@ import com.luispiquinrey.backend.notes.domain.Note;
 import com.luispiquinrey.backend.notes.domain.NoteStatus;
 import com.luispiquinrey.backend.notes.domain.PrivateNote;
 import com.luispiquinrey.backend.notes.domain.SharedNote;
+import com.luispiquinrey.backend.notes.domain.Tag;
 import com.luispiquinrey.backend.share.time.Date;
 
 import java.time.Instant;
+import java.util.List;
 
 public record NoteGetResponse(
         String id,
@@ -16,6 +18,8 @@ public record NoteGetResponse(
         String type,
         String ownerId,
         String sharedWith,
+        List<String> tags,
+        boolean pinned,
         Instant createdAt,
         Instant readAt
 ) {
@@ -45,6 +49,8 @@ public record NoteGetResponse(
                 type,
                 ownerId,
                 sharedWith,
+                note.tags().stream().map(Tag::tag).toList(),
+                note.pinned(),
                 toInstant(note.createdAt()),
                 toInstant(note.readAt())
         );

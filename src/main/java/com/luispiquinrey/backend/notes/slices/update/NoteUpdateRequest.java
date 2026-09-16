@@ -8,6 +8,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public record NoteUpdateRequest(
         @NotNull
         @NotBlank
@@ -20,5 +22,10 @@ public record NoteUpdateRequest(
         @MaxLines(300)
         @NoUrls
         @NoInvalidControlCharacters
-        String content
-) {}
+        String content,
+        List<String> tags
+) {
+    public NoteUpdateRequest(String title, String content) {
+        this(title, content, null);
+    }
+}

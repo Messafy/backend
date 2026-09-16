@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,13 +40,37 @@ class UpdateNoteServiceTest {
 
         Note updated = service.update(
                 id.id(),
-                new NoteUpdateRequest("Updated title", "Updated content"),
+                new NoteUpdateRequest("Updated title", "Updated content", List.of("personal")),
                 "507f1f77bcf86cd799439012"
         );
 
         assertEquals("Updated title", updated.title().title());
         assertEquals("Updated content", updated.content().content());
+        assertEquals(List.of("personal"), updated.tags().stream().map(com.luispiquinrey.backend.notes.domain.Tag::tag).toList());
         verify(repository).save(note);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("updateNoteService")
+    void shouldKeepExistingTagsWhenTagsAreOmitted() {
+        Note note = new NoteFactory().createPrivateNote(
+                "507f1f77bcf86cd799439011",
+                "Original title",
+                "Original content",
+                "507f1f77bcf86cd799439012",
+                List.of(new com.luispiquinrey.backend.notes.domain.Tag("existing"))
+        );
+        NoteId id = note.id();
+        when(repository.findById(id)).thenReturn(Optional.of(note));
+
+        Note updated = service.update(
+                id.id(),
+                new NoteUpdateRequest("Updated title", "Updated content", null),
+                "507f1f77bcf86cd799439012"
+        );
+
+        assertEquals(List.of("existing"), updated.tags().stream().map(com.luispiquinrey.backend.notes.domain.Tag::tag).toList());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.luispiquinrey.backend.notes.slices.update;
 import com.luispiquinrey.backend.notes.domain.Note;
 import com.luispiquinrey.backend.notes.domain.NoteId;
 import com.luispiquinrey.backend.notes.domain.NoteNotFoundException;
+import com.luispiquinrey.backend.notes.domain.Tag;
 import com.luispiquinrey.backend.notes.infrastructure.MongoDataNoteRepository;
 import com.luispiquinrey.backend.notes.infrastructure.NoteDocument;
 import com.luispiquinrey.backend.notes.infrastructure.NoteMapper;
@@ -34,6 +35,7 @@ public class MongoUpdateNoteRepository implements UpdateNoteRepository {
 
         document.setTitle(note.title().title());
         document.setContent(note.content().content());
+        document.setTags(note.tags().stream().map(Tag::tag).toList());
         repository.save(document);
     }
 }

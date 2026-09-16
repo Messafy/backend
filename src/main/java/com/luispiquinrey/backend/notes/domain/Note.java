@@ -4,6 +4,9 @@ import org.jmolecules.ddd.annotation.AggregateRoot;
 
 import com.luispiquinrey.backend.share.time.Date;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @AggregateRoot
 public abstract class Note {
     private NoteId id;
@@ -14,6 +17,8 @@ public abstract class Note {
     private Date readAt;
     private Date hiddenAt;
     private Date reportedAt;
+    private List<Tag> tags;
+    private boolean pinned;
 
     {
         this.id = null;
@@ -24,6 +29,8 @@ public abstract class Note {
         this.readAt = null;
         this.hiddenAt = null;
         this.reportedAt = null;
+        this.tags = new ArrayList<>();
+        this.pinned = false;
     }
 
     protected Note() {}
@@ -32,12 +39,17 @@ public abstract class Note {
         this.id = new NoteId(id);
         this.title = new Title(title);
         this.content = new Content(content);
-        this.status = NoteStatus.NEW;
         this.createdAt = Date.now();
         this.readAt = null;
         this.hiddenAt = null;
         this.reportedAt = null;
     }
+
+    protected Note(String id, String title, String content, List<Tag> tags) {
+        this(id, title, content);
+        this.tags = copyTags(tags);
+    }
+
 
     protected Note(
             String id,
@@ -47,7 +59,9 @@ public abstract class Note {
             Date createdAt,
             Date readAt,
             Date hiddenAt,
-            Date reportedAt
+            Date reportedAt,
+            List<Tag> tags,
+            boolean pinned
     ) {
         if (status == null) {
             throw new IllegalArgumentException("status cannot be null");
@@ -76,6 +90,8 @@ public abstract class Note {
         this.readAt = readAt;
         this.hiddenAt = hiddenAt;
         this.reportedAt = reportedAt;
+        this.tags = copyTags(tags);
+        this.pinned = pinned;
     }
 
     public NoteId id() {
@@ -149,6 +165,34 @@ public abstract class Note {
         this.status = nextStatus;
     }
 
+    public List<Tag> tags() {
+        return List.copyOf(tags);
+    }
+
+    public void replaceTags(List<Tag> tags) {
+        this.tags = copyTags(tags);
+    }
+
+    public boolean pinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
+
+    private void addTag(Tag tag) {
+        this.tags.add(tag);
+    }
+
+    private void removeTag(Tag tag) {
+        this.tags.remove(tag);
+    }
+
+    private static List<Tag> copyTags(List<Tag> tags) {
+        return tags == null ? new ArrayList<>() : new ArrayList<>(tags);
+    }
+
     @Override
     public String toString() {
         String normalizedContent = content == null
@@ -159,7 +203,7 @@ public abstract class Note {
                 ? normalizedContent
                 : normalizedContent.substring(0, 40) + "...";
 
-        return "%s{id='%s', title='%s', contentPreview='%s', status=%s, createdAt=%s, readAt=%s, hiddenAt=%s, reportedAt=%s}"
+        return "%s{id='%s', title='%s', contentPreview='%s', status=%s, createdAt=%s, readAt=%s, hiddenAt=%s, reportedAt=%s, tags=%s, pinned=%s}"
                 .formatted(
                         getClass().getSimpleName(),
                         id,
@@ -169,7 +213,9 @@ public abstract class Note {
                         createdAt,
                         readAt,
                         hiddenAt,
-                        reportedAt
+                        reportedAt,
+                        tags,
+                        pinned
                 );
     }
 
