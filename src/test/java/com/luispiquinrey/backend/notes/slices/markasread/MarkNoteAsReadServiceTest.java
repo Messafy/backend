@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Optional;
 
@@ -34,21 +35,45 @@ class MarkNoteAsReadServiceTest {
     @Test
     @Timeout(1)
     @Tag("markNoteAsReadService")
-    void shouldMarkExistingNoteAsRead() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
+    void shouldMarkExistingNoteAsReadForOwner() {
+        Note note = privateNote();
         when(repository.findById(new NoteId("507f1f77bcf86cd799439011")))
                 .thenReturn(Optional.of(note));
 
-        service.markAsRead("507f1f77bcf86cd799439011");
+        service.markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012");
 
         assertEquals(NoteStatus.READ, note.status());
         assertNotNull(note.readAt());
         verify(repository).save(note);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("markNoteAsReadService")
+    void shouldMarkSharedNoteAsReadForRecipient() {
+        Note note = sharedNote();
+        when(repository.findById(new NoteId("507f1f77bcf86cd799439011")))
+                .thenReturn(Optional.of(note));
+
+        service.markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439013");
+
+        assertEquals(NoteStatus.READ, note.status());
+        verify(repository).save(note);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("markNoteAsReadService")
+    void shouldRejectStrangerMarkingNoteAsRead() {
+        when(repository.findById(new NoteId("507f1f77bcf86cd799439011")))
+                .thenReturn(Optional.of(privateNote()));
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439014")
+        );
+        verify(repository, never()).save(new NoteFactory().createPrivateNote(
+                "507f1f77bcf86cd799439011", "Hello", "Body", "507f1f77bcf86cd799439012"));
     }
 
     @Test
@@ -60,9 +85,28 @@ class MarkNoteAsReadServiceTest {
 
         assertThrows(
                 NoteNotFoundException.class,
-                () -> service.markAsRead("507f1f77bcf86cd799439011")
+                () -> service.markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012")
         );
         verify(repository, never()).save(new NoteFactory().createPrivateNote(
                 "507f1f77bcf86cd799439011", "Hello", "Body", "507f1f77bcf86cd799439012"));
+    }
+
+    private Note privateNote() {
+        return new NoteFactory().createPrivateNote(
+                "507f1f77bcf86cd799439011",
+                "Hello",
+                "Body",
+                "507f1f77bcf86cd799439012"
+        );
+    }
+
+    private Note sharedNote() {
+        return new NoteFactory().createSharedNote(
+                "507f1f77bcf86cd799439011",
+                "Hello",
+                "Body",
+                "507f1f77bcf86cd799439012",
+                "507f1f77bcf86cd799439013"
+        );
     }
 }

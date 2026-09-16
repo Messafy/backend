@@ -25,6 +25,11 @@ public class LoginAccountService {
     }
 
     public AccountLoginResponse login(AccountLoginRequest request) {
+        if (request == null) {
+            log.warn("Login rejected because request body is missing");
+            throw new IllegalArgumentException("login request cannot be null");
+        }
+
         if (request.rawPassword() == null || request.rawPassword().isBlank()) {
             log.warn("Login rejected for {} because password is missing", request.email());
             throw new IllegalArgumentException("raw password cannot be blank");

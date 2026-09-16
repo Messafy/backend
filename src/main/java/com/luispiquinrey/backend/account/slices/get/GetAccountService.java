@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.account.slices.get;
 
+import com.luispiquinrey.backend.account.api.AccountLookup;
 import com.luispiquinrey.backend.account.domain.Account;
 import com.luispiquinrey.backend.account.domain.AccountNotFoundException;
 import com.luispiquinrey.backend.share.identity.UserId;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
-public class GetAccountService {
+public class GetAccountService implements AccountLookup {
 
     private static final Logger log = LoggerFactory.getLogger(GetAccountService.class);
 
@@ -37,6 +38,13 @@ public class GetAccountService {
                     log.warn("Account with email {} was not found", email);
                     return new AccountNotFoundException(email);
                 });
+    }
+
+    @Override
+    public boolean existsActiveAccount(String accountId) {
+        return repository.findById(new UserId(accountId))
+                .filter(Account::isActive)
+                .isPresent();
     }
 
     private Account findOrFail(UserId id) {

@@ -2,6 +2,7 @@ package com.luispiquinrey.backend.account.slices.get;
 
 import com.luispiquinrey.backend.account.domain.Account;
 import com.luispiquinrey.backend.account.domain.AccountNotFoundException;
+import com.luispiquinrey.backend.account.domain.AccountStatus;
 import com.luispiquinrey.backend.account.domain.Email;
 import com.luispiquinrey.backend.account.domain.EncodedPassword;
 import com.luispiquinrey.backend.share.identity.UserId;
@@ -15,8 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -106,11 +109,50 @@ class GetAccountServiceTest {
         verify(repository).findByEmail(EMAIL);
     }
 
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupActive")
+    void shouldConfirmActiveAccountExists() {
+        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.of(account()));
+
+        assertTrue(service.existsActiveAccount(ACCOUNT_ID));
+        verify(repository).findById(new UserId(ACCOUNT_ID));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupDeleted")
+    void shouldRejectDeletedAccount() {
+        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.of(deletedAccount()));
+
+        assertFalse(service.existsActiveAccount(ACCOUNT_ID));
+        verify(repository).findById(new UserId(ACCOUNT_ID));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupMissing")
+    void shouldRejectMissingAccount() {
+        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.empty());
+
+        assertFalse(service.existsActiveAccount(ACCOUNT_ID));
+        verify(repository).findById(new UserId(ACCOUNT_ID));
+    }
+
     private Account account() {
         return new Account.AccountBuilder()
                 .id(new UserId(ACCOUNT_ID))
                 .email(new Email(EMAIL))
                 .encodedPassword(new EncodedPassword("encoded-password"))
+                .build();
+    }
+
+    private Account deletedAccount() {
+        return new Account.AccountBuilder()
+                .id(new UserId(ACCOUNT_ID))
+                .email(new Email(EMAIL))
+                .encodedPassword(new EncodedPassword("encoded-password"))
+                .status(AccountStatus.DELETED)
                 .build();
     }
 }

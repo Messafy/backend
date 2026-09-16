@@ -8,7 +8,7 @@ The project is deliberately compact, but it treats architectural boundaries as f
 
 The service manages accounts and private or shared notes. Accounts can register, authenticate, and retrieve their current profile. Authenticated users can create notes, read notes they own or that have been shared with them, update their own notes, apply tags, pin important notes, mark notes as read, and move notes to a logical trash.
 
-A note is not modeled as a passive persistence record. It is an aggregate with validated value objects, explicit ownership, a lifecycle, timestamps, tags, and pin state. Private notes have one owner. Shared notes have an owner and one recipient. Update, delete, and pin operations are owner-oriented, while read operations can also admit the recipient of a shared note. Mark-as-read is a documented authorization gap rather than an example of that rule. Deletion is a domain transition to `DELETED`, not physical removal from MongoDB, which makes the trash view a query over retained domain state rather than a separate storage mechanism.
+A note is not modeled as a passive persistence record. It is an aggregate with validated value objects, explicit ownership, a lifecycle, timestamps, tags, and pin state. Private notes have one owner. Shared notes have an owner and one recipient. Update, delete, and pin operations are owner-oriented, while read operations and mark-as-read admit the recipient of a shared note. Deletion is a domain transition to `DELETED`, not physical removal from MongoDB, which makes the trash view a query over retained domain state rather than a separate storage mechanism.
 
 ## Architectural shape
 
@@ -69,7 +69,7 @@ Authenticated requests send the token as `Authorization: Bearer <token>`. `JwtAu
 
 The production security chain disables CSRF, form login, and HTTP Basic because the API is bearer-token based. Authentication endpoints are public. Note endpoints and the current-account endpoint admit `USER` and `ADMIN`; administrative account lookup requires `ADMIN`. CORS currently allows the local Vite origin at `http://localhost:5173`.
 
-Route authorization is only the outer boundary. Resource authorization is enforced inside note application services and read filters using the authenticated account identifier. Update, delete, and pin operations require ownership. Reading a shared note admits its recipient. Missing and inaccessible note details both result in a not-found response, avoiding unnecessary disclosure about resource existence. The mark-as-read slice is a known exception and still needs the same resource-level authorization applied by the other note operations.
+Route authorization is only the outer boundary. Resource authorization is enforced inside note application services and read filters using the authenticated account identifier. Update, delete, and pin operations require ownership. Reading a shared note and marking it as read admit its recipient. Missing and inaccessible note details both result in a not-found response, avoiding unnecessary disclosure about resource existence.
 
 There are no refresh tokens, token revocation list, or backend logout endpoint. The base configuration contains a development fallback for the signing secret, but deployed environments must provide `JWT_SECRET`. Production secrets must never be committed, printed, or copied into an image as source-controlled resources.
 
@@ -118,7 +118,7 @@ Content-Type: application/json
 }
 ```
 
-The current creation contract validates `sharedWith` even for a private note, although the value is ignored by the private-note factory. The owner query parameters are similarly validated for compatibility with the HTTP contract but replaced by the authenticated account identifier before execution. These are current contract characteristics, not security mechanisms.
+`sharedWith` is optional at the transport layer: a shared note requires it and rejects a missing or inactive recipient through the account lookup contract, while a private note ignores it. The owner query parameters are similarly validated for compatibility with the HTTP contract but replaced by the authenticated account identifier before execution. These are current contract characteristics, not security mechanisms.
 
 Validation failures produce a structured `400` response with field-level messages. Domain validation, missing resources, lifecycle conflicts, and access denial are translated centrally through controller advice into `400`, `404`, `409`, and `403` responses. Credential failures deliberately collapse account absence and password mismatch into the same `401 invalid credentials` result.
 

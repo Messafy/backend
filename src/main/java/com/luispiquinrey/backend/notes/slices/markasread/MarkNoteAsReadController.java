@@ -1,9 +1,11 @@
 package com.luispiquinrey.backend.notes.slices.markasread;
 
+import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,11 +25,13 @@ public class MarkNoteAsReadController {
 
     @PatchMapping("/{id}/read")
     public ResponseEntity<NoteMarkAsReadResponse> markAsRead(
-            @Valid @ModelAttribute NoteMarkAsReadRequest request
+            @Valid @ModelAttribute NoteMarkAsReadRequest request,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
         String id = request.id();
         log.info("Received request to mark note {} as read", id);
-        NoteMarkAsReadResponse response = NoteMarkAsReadResponse.from(service.markAsRead(id));
+        NoteMarkAsReadResponse response = NoteMarkAsReadResponse.from(
+                service.markAsRead(id, authenticatedUser.accountId()));
         log.info("Marked note {} as read at {}", id, response.readAt());
         return ResponseEntity.ok(response);
     }

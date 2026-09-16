@@ -23,8 +23,6 @@ public record NoteCreationRequest(
         @NoUrls(message = "Content cannot contain URLs")
         @NoInvalidControlCharacters(message = "Content cannot contain invalid control characters")
         String content,
-        @NotNull(message = "Shared-with ID cannot be null")
-        @NotEmpty(message = "Shared-with ID cannot be empty")
         @Pattern(
                 regexp = "^[a-fA-F0-9]{24}$",
                 message = "Shared-with ID must be a valid 24-character hexadecimal ObjectId"

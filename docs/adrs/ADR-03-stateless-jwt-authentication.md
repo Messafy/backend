@@ -38,7 +38,7 @@ There are no refresh tokens, revocation records, or backend logout endpoint. A t
 
 The base configuration contains a development fallback signing secret. Production and Compose environments must override it with `JWT_SECRET`; the fallback must not be treated as production-safe. Key rotation is not implemented.
 
-Resource authorization is not yet perfectly uniform. Owners control update, delete, and pin operations, and recipients can read shared notes. The mark-as-read slice does not currently receive the authenticated principal and must be brought under the same ownership or recipient checks. Client-side route guards are user-experience controls, not a confidentiality boundary.
+Resource authorization is uniform across note operations. Owners control update, delete, and pin operations, and recipients can read shared notes and mark them as read. Client-side route guards are user-experience controls, not a confidentiality boundary.
 
 ## Consequences
 

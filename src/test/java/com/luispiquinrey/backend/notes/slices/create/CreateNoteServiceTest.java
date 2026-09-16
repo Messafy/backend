@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.slices.create;
 
+import com.luispiquinrey.backend.account.api.AccountLookup;
 import com.luispiquinrey.backend.notes.domain.Note;
 import com.luispiquinrey.backend.notes.domain.NoteStatus;
 import com.luispiquinrey.backend.notes.domain.NoteValidationException;
@@ -22,13 +23,20 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CreateNoteServiceTest {
 
     @Mock
     private CreateNoteRepository repository;
+
+    @Mock
+    private AccountLookup accountLookup;
 
     @InjectMocks
     private CreateNoteService service;
@@ -55,6 +63,7 @@ class CreateNoteServiceTest {
         assertEquals(List.of("work", "urgent"), note.tags().stream().map(com.luispiquinrey.backend.notes.domain.Tag::tag).toList());
         assertTrue(note.isOwnedBy("507f1f77bcf86cd799439012"));
         assertFalse(note.isOwnedBy("507f1f77bcf86cd799439013"));
+        verifyNoInteractions(accountLookup);
 
         ArgumentCaptor<Note> captor = ArgumentCaptor.forClass(Note.class);
         verify(repository).save(captor.capture());
@@ -65,6 +74,8 @@ class CreateNoteServiceTest {
     @Timeout(1)
     @Tag("createNoteService")
     void shouldCreateSharedNoteFromDto() {
+        when(accountLookup.existsActiveAccount("507f1f77bcf86cd799439013")).thenReturn(true);
+
         NoteCreationRequest dto = new NoteCreationRequest(
                 NoteCreationRequest.NoteType.SHARED,
                 "Hello",
@@ -75,7 +86,47 @@ class CreateNoteServiceTest {
         Note note = service.createNote(dto, "507f1f77bcf86cd799439012");
 
         assertInstanceOf(SharedNote.class, note);
+        verify(accountLookup).existsActiveAccount("507f1f77bcf86cd799439013");
         verify(repository).save(note);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("createNoteService")
+    void shouldRejectSharedNoteWhenRecipientIsNotActive() {
+        when(accountLookup.existsActiveAccount("507f1f77bcf86cd799439013")).thenReturn(false);
+
+        NoteCreationRequest dto = new NoteCreationRequest(
+                NoteCreationRequest.NoteType.SHARED,
+                "Hello",
+                "Body",
+                "507f1f77bcf86cd799439013"
+        );
+
+        assertThrows(
+                NoteValidationException.class,
+                () -> service.createNote(dto, "507f1f77bcf86cd799439012")
+        );
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("createNoteService")
+    void shouldRejectSharedNoteWhenRecipientIsMissing() {
+        NoteCreationRequest dto = new NoteCreationRequest(
+                NoteCreationRequest.NoteType.SHARED,
+                "Hello",
+                "Body",
+                null
+        );
+
+        assertThrows(
+                NoteValidationException.class,
+                () -> service.createNote(dto, "507f1f77bcf86cd799439012")
+        );
+        verifyNoInteractions(accountLookup);
+        verify(repository, never()).save(any());
     }
 
     @Test

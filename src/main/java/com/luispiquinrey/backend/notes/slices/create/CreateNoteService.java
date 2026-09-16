@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.slices.create;
 
+import com.luispiquinrey.backend.account.api.AccountLookup;
 import com.luispiquinrey.backend.notes.domain.Note;
 import com.luispiquinrey.backend.notes.domain.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.NoteValidationException;
@@ -15,10 +16,12 @@ public class CreateNoteService {
     private static final Logger log = LoggerFactory.getLogger(CreateNoteService.class);
 
     private final CreateNoteRepository repository;
+    private final AccountLookup accountLookup;
     private final NoteFactory noteFactory = new NoteFactory();
 
-    public CreateNoteService(CreateNoteRepository repository) {
+    public CreateNoteService(CreateNoteRepository repository, AccountLookup accountLookup) {
         this.repository = repository;
+        this.accountLookup = accountLookup;
     }
 
     public Note createNote(NoteCreationRequest noteCreationRequest, String authenticatedAccountId) {
@@ -45,14 +48,27 @@ public class CreateNoteService {
                     authenticatedAccountId,
                     tags
             );
-            case SHARED -> noteFactory.createSharedNote(
-                    noteId,
-                    noteCreationRequest.title(),
-                    noteCreationRequest.content(),
-                    authenticatedAccountId,
-                    noteCreationRequest.sharedWith(),
-                    tags
-            );
+            case SHARED -> {
+                if (noteCreationRequest.sharedWith() == null || noteCreationRequest.sharedWith().isBlank()) {
+                    log.warn("Shared note {} rejected because recipient is missing", noteId);
+                    throw new NoteValidationException("shared note recipient cannot be null or empty");
+                }
+
+                if (!accountLookup.existsActiveAccount(noteCreationRequest.sharedWith())) {
+                    log.warn("Shared note {} rejected because recipient {} is not an active account",
+                            noteId, noteCreationRequest.sharedWith());
+                    throw new NoteValidationException("shared note recipient must be an active account");
+                }
+
+                yield noteFactory.createSharedNote(
+                        noteId,
+                        noteCreationRequest.title(),
+                        noteCreationRequest.content(),
+                        authenticatedAccountId,
+                        noteCreationRequest.sharedWith(),
+                        tags
+                );
+            }
         };
 
         repository.save(note);
