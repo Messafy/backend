@@ -65,7 +65,7 @@ class RegisterAccountServiceTest {
         verify(passwordHasher).hash("Password1!");
         ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
         verify(repository).save(captor.capture());
-        verify(domainEventPublisher).publish(new AccountRegistered(accountIdGenerator.nextId()));
+        verify(domainEventPublisher).publish(new AccountRegistered(accountIdGenerator.nextId(), "user@example.com"));
 
         Account account = captor.getValue();
         assertNotNull(account.id());

@@ -51,7 +51,7 @@ public class RegisterAccountService {
 
         accountRepository.save(account);
 
-        domainEventPublisher.publish(new AccountRegistered(account.id().id()));
+        domainEventPublisher.publish(new AccountRegistered(account.id().id(), account.email().email()));
 
         return AccountView.from(account);
     }

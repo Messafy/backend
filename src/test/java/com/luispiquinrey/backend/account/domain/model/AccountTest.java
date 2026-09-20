@@ -118,6 +118,7 @@ public class AccountTest {
     @Tag("account")
     void shouldRecordLoginForActiveAccount() {
         Account account = validAccountBuilder().build();
+        account.verify();
 
         account.login();
 

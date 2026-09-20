@@ -116,10 +116,12 @@ class LoginAccountServiceTest {
     }
 
     private Account account() {
-        return new Account.AccountBuilder()
+        Account account = new Account.AccountBuilder()
                 .id(new UserId("507f1f77bcf86cd799439011"))
                 .email(new Email("user@example.com"))
                 .encodedPassword(new EncodedPassword("encoded-password"))
                 .build();
+        account.verify();
+        return account;
     }
 }

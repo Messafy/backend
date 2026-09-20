@@ -82,14 +82,11 @@ public class Account implements Serializable {
     }
 
     public void login() {
-        // The user must verify the account through the email verification flow before logging in.
-        /*
         if (!isVerified) {
             throw new AccountConflictException(
                     "cannot login an account that has not been verified"
             );
         }
-         */
         if (isFinal()) {
             throw new AccountConflictException(
                     "cannot login a %s account".formatted(status)
