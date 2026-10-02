@@ -14,6 +14,8 @@ public interface NoteRepository {
 
     void save(Note note);
 
+    void delete(Note note);
+
     List<Note> findByStatus(String status);
 
     List<Note> findActiveByOwner(String ownerId);

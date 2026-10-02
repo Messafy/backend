@@ -101,10 +101,10 @@ public class NoteMapper {
                 note.title().title(),
                 note.content().content(),
                 note.status().name(),
-                note.createdAt() == null ? null : note.createdAt().value().toString(),
-                note.readAt() == null ? null : note.readAt().value().toString(),
-                note.hiddenAt() == null ? null : note.hiddenAt().value().toString(),
-                note.reportedAt() == null ? null : note.reportedAt().value().toString(),
+                toIsoString(note.createdAt()),
+                toIsoString(note.readAt()),
+                toIsoString(note.hiddenAt()),
+                toIsoString(note.reportedAt()),
                 toDocumentTags(note.tags()),
                 note.ownerId().id()
         );
@@ -118,10 +118,10 @@ public class NoteMapper {
                 note.title().title(),
                 note.content().content(),
                 note.status().name(),
-                note.createdAt() == null ? null : note.createdAt().value().toString(),
-                note.readAt() == null ? null : note.readAt().value().toString(),
-                note.hiddenAt() == null ? null : note.hiddenAt().value().toString(),
-                note.reportedAt() == null ? null : note.reportedAt().value().toString(),
+                toIsoString(note.createdAt()),
+                toIsoString(note.readAt()),
+                toIsoString(note.hiddenAt()),
+                toIsoString(note.reportedAt()),
                 toDocumentTags(note.tags()),
                 note.ownerId().id(),
                 note.sharedWith().ownerId().id()
@@ -132,6 +132,10 @@ public class NoteMapper {
 
     private Date toNoteDate(String date) {
         return date == null ? null : new Date(Instant.parse(date));
+    }
+
+    private String toIsoString(Date date) {
+        return date == null ? null : date.value().toString();
     }
 
     private List<Tag> toDomainTags(List<String> tags) {

@@ -7,6 +7,7 @@ import java.time.Instant;
 public record RegisterAccountResponse(
         String id,
         String email,
+        String publicCode,
         String role,
         Instant createdAt
 ) {
@@ -15,6 +16,7 @@ public record RegisterAccountResponse(
         return new RegisterAccountResponse(
                 accountView.id(),
                 accountView.email(),
+                accountView.publicCode(),
                 accountView.role(),
                 accountView.createdAt()
         );

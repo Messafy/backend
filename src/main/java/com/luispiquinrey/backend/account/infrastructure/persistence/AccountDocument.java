@@ -21,18 +21,25 @@ public class AccountDocument {
     private String role;
     private String accountStatus;
     private boolean isVerified;
+
+    @Indexed(name = "public_code", unique = true)
+    private String publicCode;
+
+    private String encodedLockerPassword;
     private String createdAt;
     private String lastLoginAt;
 
     public AccountDocument() {}
 
-    public AccountDocument(ObjectId id, String email, String encodedPassword, String role, String accountStatus, boolean isVerified, String createdAt, String lastLoginAt) {
+    public AccountDocument(ObjectId id, String email, String encodedPassword, String role, String accountStatus, boolean isVerified, String publicCode, String encodedLockerPassword, String createdAt, String lastLoginAt) {
         this.id = id;
         this.email = email;
         this.encodedPassword = encodedPassword;
         this.role = role;
         this.accountStatus = accountStatus;
         this.isVerified = isVerified;
+        this.publicCode = publicCode;
+        this.encodedLockerPassword = encodedLockerPassword;
         this.createdAt = createdAt;
         this.lastLoginAt = lastLoginAt;
     }
@@ -91,6 +98,22 @@ public class AccountDocument {
 
     public void setVerified(boolean verified) {
         isVerified = verified;
+    }
+
+    public String getPublicCode() {
+        return publicCode;
+    }
+
+    public void setPublicCode(String publicCode) {
+        this.publicCode = publicCode;
+    }
+
+    public String getEncodedLockerPassword() {
+        return encodedLockerPassword;
+    }
+
+    public void setEncodedLockerPassword(String encodedLockerPassword) {
+        this.encodedLockerPassword = encodedLockerPassword;
     }
 
     public String getCreatedAt() {

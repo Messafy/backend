@@ -63,6 +63,9 @@ public class SecurityConfig {
                         .requestMatchers("/v1/auth/**")
                         .permitAll()
 
+                        .requestMatchers("/ws")
+                        .permitAll()
+
                         .requestMatchers("/v1/admin/**")
                         .hasRole(ROLE_ADMIN)
 

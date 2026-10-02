@@ -9,17 +9,20 @@ import java.time.Instant;
 
 public record NoteCreationResponse(
         String id,
-        NoteCreationRequest.NoteType type,
+        String type,
         NoteStatus status,
         Instant createdAt
 ) {
 
     public static NoteCreationResponse from(Note note) {
-        NoteCreationRequest.NoteType type = switch (note) {
-            case PrivateNote ignored -> NoteCreationRequest.NoteType.PRIVATE;
-            case SharedNote ignored -> NoteCreationRequest.NoteType.SHARED;
-            default -> throw new IllegalStateException("unsupported note type: " + note.getClass());
-        };
+        String type;
+        if (note instanceof PrivateNote) {
+            type = "PRIVATE";
+        } else if (note instanceof SharedNote) {
+            type = "SHARED";
+        } else {
+            throw new IllegalStateException("unsupported note type: " + note.getClass());
+        }
 
         return new NoteCreationResponse(
                 note.id().id(),

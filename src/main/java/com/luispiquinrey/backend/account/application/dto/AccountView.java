@@ -8,6 +8,7 @@ import java.time.Instant;
 public record AccountView(
         String id,
         String email,
+        String publicCode,
         String role,
         String status,
         boolean verified,
@@ -21,6 +22,7 @@ public record AccountView(
         return new AccountView(
                 account.id().id(),
                 account.email().email(),
+                account.publicCode().value(),
                 account.role().name(),
                 account.status().name(),
                 account.isVerified(),

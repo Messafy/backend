@@ -13,5 +13,7 @@ public interface AccountRepository {
 
     Optional<Account> findByEmail(String email);
 
+    Optional<Account> findByPublicCode(String publicCode);
+
     void save(Account account);
 }

@@ -3,6 +3,7 @@ package com.luispiquinrey.backend.account.infrastructure.persistence;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
+import com.luispiquinrey.backend.share.time.Date;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -41,6 +42,15 @@ public class AccountRepositoryAdapter implements AccountRepository {
     }
 
     @Override
+    public Optional<Account> findByPublicCode(String publicCode) {
+        log.debug("Querying MongoDB for account with public code {}", publicCode);
+        Optional<Account> account = mongoDataAccountRepository.findByPublicCode(publicCode)
+                .map(accountMapper::toDomain);
+        log.debug("MongoDB {} account with public code {}", account.isPresent() ? "found" : "did not find", publicCode);
+        return account;
+    }
+
+    @Override
     public void save(Account account) {
         log.debug("Persisting account {} in MongoDB", account.id().id());
         mongoDataAccountRepository.findById(accountMapper.toObjectId(account.id().id()))
@@ -57,7 +67,13 @@ public class AccountRepositoryAdapter implements AccountRepository {
         document.setRole(account.role().name());
         document.setAccountStatus(account.status().name());
         document.setVerified(account.isVerified());
-        document.setLastLoginAt(account.lastLoginAt() == null ? null : account.lastLoginAt().value().toString());
+        document.setPublicCode(account.publicCode().value());
+        document.setEncodedLockerPassword(account.lockerPassword().value());
+        document.setLastLoginAt(toIsoString(account.lastLoginAt()));
         mongoDataAccountRepository.save(document);
+    }
+
+    private String toIsoString(Date date) {
+        return date == null ? null : date.value().toString();
     }
 }

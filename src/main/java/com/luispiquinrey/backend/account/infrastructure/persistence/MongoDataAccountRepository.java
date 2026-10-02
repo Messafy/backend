@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface MongoDataAccountRepository extends MongoRepository<AccountDocument, ObjectId> {
     Optional<AccountDocument> findByEmail(String email);
+
+    Optional<AccountDocument> findByPublicCode(String publicCode);
 }

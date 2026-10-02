@@ -2,10 +2,12 @@ package com.luispiquinrey.backend.notes.application.service;
 
 import com.luispiquinrey.backend.notes.application.dto.UpdateNoteCommand;
 import com.luispiquinrey.backend.notes.domain.exception.NoteAccessDeniedException;
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteValidationException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
+import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,10 @@ public class UpdateNoteService {
 
         if (!note.isOwnedBy(authenticatedAccountId)) {
             throw new NoteAccessDeniedException("you cannot update this note");
+        }
+
+        if (note instanceof SharedNote) {
+            throw new NoteConflictException("shared notes cannot be edited after they are sent");
         }
 
         note.rename(command.title());

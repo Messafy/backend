@@ -25,12 +25,15 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(AccountPasswordMismatchException.class)
     public ProblemDetail handlePasswordMismatch(AccountPasswordMismatchException ex) {
-        log.warn("Request failed because credentials were invalid: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "invalid credentials");
+        return invalidCredentials(ex);
     }
 
     @ExceptionHandler(AccountAuthenticationException.class)
     public ProblemDetail handleAuthenticationFailure(AccountAuthenticationException ex) {
+        return invalidCredentials(ex);
+    }
+
+    private ProblemDetail invalidCredentials(RuntimeException ex) {
         log.warn("Request failed because credentials were invalid: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "invalid credentials");
     }

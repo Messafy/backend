@@ -7,6 +7,7 @@ import java.time.Instant;
 public record AccountGetResponse(
         String id,
         String email,
+        String publicCode,
         String role,
         String status,
         boolean verified,
@@ -18,6 +19,7 @@ public record AccountGetResponse(
         return new AccountGetResponse(
                 accountView.id(),
                 accountView.email(),
+                accountView.publicCode(),
                 accountView.role(),
                 accountView.status(),
                 accountView.verified(),

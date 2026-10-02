@@ -4,6 +4,8 @@ import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
+import com.luispiquinrey.backend.account.domain.model.LockerPassword;
+import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.model.Role;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
@@ -26,6 +28,8 @@ public class AccountMapper {
                 .role(accountDocument.getRole() == null ? null : Role.valueOf(accountDocument.getRole()))
                 .status(accountDocument.getAccountStatus() == null ? null : AccountStatus.valueOf(accountDocument.getAccountStatus()))
                 .isVerified(accountDocument.isVerified())
+                .publicCode(new PublicCode(accountDocument.getPublicCode()))
+                .lockerPassword(new LockerPassword(accountDocument.getEncodedLockerPassword()))
                 .createdAt(toAccountDate(accountDocument.getCreatedAt()))
                 .lastLoginAt(toAccountDate(accountDocument.getLastLoginAt()))
                 .build();
@@ -41,8 +45,10 @@ public class AccountMapper {
                 account.role().name(),
                 account.status().name(),
                 account.isVerified(),
-                account.createdAt() == null ? null : account.createdAt().value().toString(),
-                account.lastLoginAt() == null ? null : account.lastLoginAt().value().toString()
+                account.publicCode().value(),
+                account.lockerPassword().value(),
+                toIsoString(account.createdAt()),
+                toIsoString(account.lastLoginAt())
         );
     }
 
@@ -53,5 +59,9 @@ public class AccountMapper {
 
     private Date toAccountDate(String date) {
         return date == null ? null : new Date(Instant.parse(date));
+    }
+
+    private String toIsoString(Date date) {
+        return date == null ? null : date.value().toString();
     }
 }

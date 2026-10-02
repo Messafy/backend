@@ -1,15 +1,17 @@
 package com.luispiquinrey.backend.notes.presentation.dto;
 
-import com.luispiquinrey.backend.notes.application.dto.CreateNoteCommand;
+import com.luispiquinrey.backend.notes.application.dto.CreatePrivateNoteCommand;
 import com.luispiquinrey.backend.notes.presentation.validation.MaxLines;
 import com.luispiquinrey.backend.notes.presentation.validation.NoInvalidControlCharacters;
 import com.luispiquinrey.backend.notes.presentation.validation.NoUrls;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-public record NoteCreationRequest(
-        NoteType type,
+public record PrivateNoteCreationRequest(
         @NotNull(message = "Title cannot be null")
         @NotBlank(message = "Title cannot be blank")
         @Size(max = 100, message = "Title cannot be longer than 100 characters")
@@ -24,28 +26,9 @@ public record NoteCreationRequest(
         @NoUrls(message = "Content cannot contain URLs")
         @NoInvalidControlCharacters(message = "Content cannot contain invalid control characters")
         String content,
-        @Pattern(
-                regexp = "^[a-fA-F0-9]{24}$",
-                message = "Shared-with ID must be a valid 24-character hexadecimal ObjectId"
-        ) String sharedWith,
         List<String> tags
 ) {
-    public NoteCreationRequest(NoteType type, String title, String content, String sharedWith) {
-        this(type, title, content, sharedWith, null);
-    }
-
-    public CreateNoteCommand toCommand() {
-        return new CreateNoteCommand(
-                type == null ? null : CreateNoteCommand.NoteType.valueOf(type.name()),
-                title,
-                content,
-                sharedWith,
-                tags
-        );
-    }
-
-    public enum NoteType {
-        PRIVATE,
-        SHARED
+    public CreatePrivateNoteCommand toCommand() {
+        return new CreatePrivateNoteCommand(title, content, tags);
     }
 }

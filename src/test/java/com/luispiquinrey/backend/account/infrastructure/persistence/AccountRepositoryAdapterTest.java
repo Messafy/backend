@@ -3,6 +3,8 @@ package com.luispiquinrey.backend.account.infrastructure.persistence;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
+import com.luispiquinrey.backend.account.domain.model.LockerPassword;
+import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
 import org.bson.types.ObjectId;
@@ -32,6 +34,9 @@ class AccountRepositoryAdapterTest {
 
     private static final String ACCOUNT_ID = "507f1f77bcf86cd799439011";
     private static final String EMAIL = "user@example.com";
+    private static final String ENCODED_PASSWORD = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+    private static final String ENCODED_LOCKER = "$2a$10$7EqJtq98hPqEX7fNZaFWoO5z7c2uR3HF4YDs5H3WwQ1S/9vGQ4r6e";
+    private static final String PUBLIC_CODE = "V1StGXR8_Z5j";
 
     @Mock
     private MongoDataAccountRepository mongoRepository;
@@ -186,10 +191,12 @@ class AccountRepositoryAdapterTest {
         repository.save(account);
 
         assertEquals(EMAIL, document.getEmail());
-        assertEquals("encoded-password", document.getEncodedPassword());
+        assertEquals(ENCODED_PASSWORD, document.getEncodedPassword());
         assertEquals("USER", document.getRole());
         assertEquals("ACTIVE", document.getAccountStatus());
         assertFalse(document.isVerified());
+        assertEquals(PUBLIC_CODE, document.getPublicCode());
+        assertEquals(ENCODED_LOCKER, document.getEncodedLockerPassword());
         verify(mongoRepository).save(document);
     }
 
@@ -197,7 +204,9 @@ class AccountRepositoryAdapterTest {
         return new Account.AccountBuilder()
                 .id(new UserId(ACCOUNT_ID))
                 .email(new Email(EMAIL))
-                .encodedPassword(new EncodedPassword("encoded-password"))
+                .encodedPassword(new EncodedPassword(ENCODED_PASSWORD))
+                .publicCode(new PublicCode(PUBLIC_CODE))
+                .lockerPassword(new LockerPassword(ENCODED_LOCKER))
                 .lastLoginAt(lastLoginAt)
                 .build();
     }
@@ -210,10 +219,12 @@ class AccountRepositoryAdapterTest {
         return new AccountDocument(
                 objectId,
                 EMAIL,
-                "encoded-password",
+                ENCODED_PASSWORD,
                 "USER",
                 "ACTIVE",
                 true,
+                PUBLIC_CODE,
+                ENCODED_LOCKER,
                 "2026-01-01T10:00:00Z",
                 "2026-01-02T10:00:00Z"
         );

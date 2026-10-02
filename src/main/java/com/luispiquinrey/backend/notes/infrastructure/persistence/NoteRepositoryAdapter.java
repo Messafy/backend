@@ -5,6 +5,7 @@ import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import com.luispiquinrey.backend.share.time.Date;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +60,13 @@ public class NoteRepositoryAdapter implements NoteRepository {
     }
 
     @Override
+    public void delete(Note note) {
+        log.debug("Deleting note {} from MongoDB", note.id().id());
+        baseRepository.deleteById(mapper.toObjectId(note.id().id()));
+        log.debug("MongoDB deleted note {}", note.id().id());
+    }
+
+    @Override
     public List<Note> findByStatus(String status) {
         log.debug("Querying MongoDB for notes with status {}", status);
         List<Note> notes = baseRepository.findAllByStatus(status)
@@ -76,13 +84,8 @@ public class NoteRepositoryAdapter implements NoteRepository {
         List<NoteDocument> documents = new ArrayList<>();
         documents.addAll(privateRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
         documents.addAll(sharedRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
-        documents.addAll(sharedRepository.findAllByStatusInAndSharedWith(
-                visibleStatuses,
-                ownerId
-        ));
-        Map<ObjectId, NoteDocument> uniqueDocuments = new LinkedHashMap<>();
-        documents.forEach(document -> uniqueDocuments.putIfAbsent(document.getId(), document));
-        List<Note> notes = uniqueDocuments.values().stream().map(mapper::toDomain).toList();
+        documents.addAll(sharedRepository.findAllByStatusInAndSharedWith(visibleStatuses, ownerId));
+        List<Note> notes = dedupeById(documents).stream().map(mapper::toDomain).toList();
         log.debug("MongoDB returned {} active notes for owner {}", notes.size(), ownerId);
         return notes;
     }
@@ -115,6 +118,16 @@ public class NoteRepositoryAdapter implements NoteRepository {
         List<NoteDocument> documents = new ArrayList<>();
         documents.addAll(privateRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
         documents.addAll(sharedRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
+        return toDomainList(documents);
+    }
+
+    private List<NoteDocument> dedupeById(List<NoteDocument> documents) {
+        Map<ObjectId, NoteDocument> unique = new LinkedHashMap<>();
+        documents.forEach(document -> unique.putIfAbsent(document.getId(), document));
+        return new ArrayList<>(unique.values());
+    }
+
+    private List<Note> toDomainList(List<NoteDocument> documents) {
         return documents.stream().map(mapper::toDomain).toList();
     }
 
@@ -122,11 +135,15 @@ public class NoteRepositoryAdapter implements NoteRepository {
         document.setTitle(note.title().title());
         document.setContent(note.content().content());
         document.setStatus(note.status().name());
-        document.setReadAt(note.readAt() == null ? null : note.readAt().value().toString());
-        document.setHiddenAt(note.hiddenAt() == null ? null : note.hiddenAt().value().toString());
-        document.setReportedAt(note.reportedAt() == null ? null : note.reportedAt().value().toString());
+        document.setReadAt(toIsoString(note.readAt()));
+        document.setHiddenAt(toIsoString(note.hiddenAt()));
+        document.setReportedAt(toIsoString(note.reportedAt()));
         document.setTags(note.tags().stream().map(Tag::tag).toList());
         document.setPinned(note.pinned());
         baseRepository.save(document);
+    }
+
+    private String toIsoString(Date date) {
+        return date == null ? null : date.value().toString();
     }
 }

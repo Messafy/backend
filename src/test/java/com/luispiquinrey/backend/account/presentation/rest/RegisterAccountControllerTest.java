@@ -27,11 +27,13 @@ class RegisterAccountControllerTest {
     void shouldReturnCreatedWithRegistrationResponse() {
         RegisterAccountCommand command = new RegisterAccountCommand(
                 "user@example.com",
-                "Password1!"
+                "Password1!",
+                "Locker1!"
         );
         AccountView view = new AccountView(
                 "507f1f77bcf86cd799439011",
                 "user@example.com",
+                "V1StGXR8_Z5j",
                 "USER",
                 "ACTIVE",
                 false,
@@ -48,6 +50,7 @@ class RegisterAccountControllerTest {
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals("507f1f77bcf86cd799439011", response.getBody().id());
         assertEquals("user@example.com", response.getBody().email());
+        assertEquals("V1StGXR8_Z5j", response.getBody().publicCode());
         assertEquals("USER", response.getBody().role());
         assertEquals(Instant.parse("2026-09-12T10:15:30Z"), response.getBody().createdAt());
     }
@@ -58,7 +61,8 @@ class RegisterAccountControllerTest {
     void shouldPropagateExceptionFromService() {
         RegisterAccountCommand command = new RegisterAccountCommand(
                 "user@example.com",
-                "   "
+                "   ",
+                "Locker1!"
         );
         RegisterAccountService service = mock(RegisterAccountService.class);
         IllegalArgumentException exception = new IllegalArgumentException("raw password cannot be blank");

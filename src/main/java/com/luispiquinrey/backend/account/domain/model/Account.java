@@ -16,6 +16,8 @@ public class Account implements Serializable {
     private Role role;
     private AccountStatus status;
     private boolean isVerified;
+    private PublicCode publicCode;
+    private LockerPassword lockerPassword;
     private Date createdAt;
     private Date lastLoginAt;
 
@@ -29,6 +31,12 @@ public class Account implements Serializable {
         if (builder.encodedPassword == null) {
             throw new IllegalArgumentException("encoded password cannot be null");
         }
+        if (builder.publicCode == null) {
+            throw new IllegalArgumentException("public code cannot be null");
+        }
+        if (builder.lockerPassword == null) {
+            throw new IllegalArgumentException("locker password cannot be null");
+        }
 
         this.id = builder.id;
         this.email = builder.email;
@@ -36,6 +44,8 @@ public class Account implements Serializable {
         this.role = builder.role == null ? Role.USER : builder.role;
         this.status = builder.status == null ? AccountStatus.ACTIVE : builder.status;
         this.isVerified = builder.isVerified;
+        this.publicCode = builder.publicCode;
+        this.lockerPassword = builder.lockerPassword;
         this.createdAt = builder.createdAt == null ? Date.now() : builder.createdAt;
         this.lastLoginAt = builder.lastLoginAt;
     }
@@ -62,6 +72,14 @@ public class Account implements Serializable {
 
     public boolean isVerified() {
         return isVerified;
+    }
+
+    public PublicCode publicCode() {
+        return publicCode;
+    }
+
+    public LockerPassword lockerPassword() {
+        return lockerPassword;
     }
 
     public Date createdAt() {
@@ -99,6 +117,30 @@ public class Account implements Serializable {
         transitionTo(AccountStatus.DELETED);
     }
 
+    public void rotatePublicCode(PublicCode newPublicCode) {
+        if (isFinal()) {
+            throw new AccountConflictException(
+                    "cannot rotate public code for a %s account".formatted(status)
+            );
+        }
+        if (newPublicCode == null) {
+            throw new IllegalArgumentException("public code cannot be null");
+        }
+        this.publicCode = newPublicCode;
+    }
+
+    public void changeLockerPassword(LockerPassword newLockerPassword) {
+        if (isFinal()) {
+            throw new AccountConflictException(
+                    "cannot change locker password for a %s account".formatted(status)
+            );
+        }
+        if (newLockerPassword == null) {
+            throw new IllegalArgumentException("locker password cannot be null");
+        }
+        this.lockerPassword = newLockerPassword;
+    }
+
     public boolean isActive() {
         return status == AccountStatus.ACTIVE;
     }
@@ -123,6 +165,8 @@ public class Account implements Serializable {
         private Role role;
         private AccountStatus status;
         private boolean isVerified;
+        private PublicCode publicCode;
+        private LockerPassword lockerPassword;
         private Date createdAt;
         private Date lastLoginAt;
 
@@ -153,6 +197,16 @@ public class Account implements Serializable {
 
         public AccountBuilder isVerified(boolean isVerified) {
             this.isVerified = isVerified;
+            return this;
+        }
+
+        public AccountBuilder publicCode(PublicCode publicCode) {
+            this.publicCode = publicCode;
+            return this;
+        }
+
+        public AccountBuilder lockerPassword(LockerPassword lockerPassword) {
+            this.lockerPassword = lockerPassword;
             return this;
         }
 
