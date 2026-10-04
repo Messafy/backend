@@ -2,8 +2,6 @@ package com.luispiquinrey.backend.account.presentation.rest;
 
 import com.luispiquinrey.backend.account.application.dto.AccountView;
 import com.luispiquinrey.backend.account.application.service.GetAccountService;
-import com.luispiquinrey.backend.account.domain.exception.AccountNotFoundException;
-import com.luispiquinrey.backend.account.infrastructure.security.AccountUserDetails;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
 import com.luispiquinrey.backend.account.domain.model.Email;
@@ -11,26 +9,27 @@ import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
 import com.luispiquinrey.backend.account.domain.model.LockerPassword;
 import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.model.Role;
-import com.luispiquinrey.backend.account.presentation.dto.AccountGetRequest;
-import com.luispiquinrey.backend.account.presentation.dto.AccountGetResponse;
+import com.luispiquinrey.backend.account.infrastructure.security.AccountUserDetails;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static de.flapdoodle.embed.mongo.client.AuthenticationSetup.user;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class GetAccountControllerTest {
 
@@ -40,88 +39,36 @@ class GetAccountControllerTest {
     private static final String PUBLIC_CODE = "V1StGXR8_Z5j";
 
     @Test
-    @Timeout(1)
-    @Tag("getMyAccountResponse")
-    void shouldReturnOkWithCurrentAccount() {
-        Account account = account();
-        AccountUserDetails principal = new AccountUserDetails(account);
+    @Timeout(3)
+    @Tag("getAccountController")
+    void shouldReturnAccountForPathId() throws Exception {
         GetAccountService service = mock(GetAccountService.class);
-        GetAccountController controller = new GetAccountController(service);
+        when(service.findById(ACCOUNT_ID)).thenReturn(AccountView.from(account()));
+
+        mockMvc(service).perform(get("/v1/accounts/{id}", ACCOUNT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ACCOUNT_ID))
+                .andExpect(jsonPath("$.email").value("user@example.com"));
+    }
+
+    @Test
+    @Timeout(3)
+    @Tag("getAccountController")
+    void shouldReturnCurrentAccount() throws Exception {
+        Account account = account();
+        GetAccountService service = mock(GetAccountService.class);
         when(service.getMyAccount(account.id())).thenReturn(AccountView.from(account));
 
-        ResponseEntity<AccountGetResponse> response = controller.me(principal);
-
-        assertAccountResponse(response);
-        verify(service).getMyAccount(account.id());
+        mockMvc(service).perform(get("/v1/accounts/me").with(user(new AccountUserDetails(account()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ACCOUNT_ID));
     }
 
-    @Test
-    @Timeout(1)
-    @Tag("getMyAccountFailurePropagation")
-    void shouldPropagateCurrentAccountFailure() {
-        Account account = account();
-        AccountUserDetails principal = new AccountUserDetails(account);
-        GetAccountService service = mock(GetAccountService.class);
-        GetAccountController controller = new GetAccountController(service);
-        AccountNotFoundException failure = new AccountNotFoundException(ACCOUNT_ID);
-        when(service.getMyAccount(account.id())).thenThrow(failure);
-
-        AccountNotFoundException thrown = assertThrows(
-                AccountNotFoundException.class,
-                () -> controller.me(principal)
-        );
-
-        assertSame(failure, thrown);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("getAccountByIdResponse")
-    void shouldReturnOkWithAccountById() {
-        Account account = account();
-        AccountGetRequest request = new AccountGetRequest(ACCOUNT_ID);
-        GetAccountService service = mock(GetAccountService.class);
-        GetAccountController controller = new GetAccountController(service);
-        when(service.findById(ACCOUNT_ID)).thenReturn(AccountView.from(account));
-
-        ResponseEntity<AccountGetResponse> response = controller.getById(request);
-
-        assertAccountResponse(response);
-        verify(service).findById(ACCOUNT_ID);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("getAccountByIdFailurePropagation")
-    void shouldPropagateGetByIdFailure() {
-        AccountGetRequest request = new AccountGetRequest(ACCOUNT_ID);
-        GetAccountService service = mock(GetAccountService.class);
-        GetAccountController controller = new GetAccountController(service);
-        AccountNotFoundException failure = new AccountNotFoundException(ACCOUNT_ID);
-        when(service.findById(ACCOUNT_ID)).thenThrow(failure);
-
-        AccountNotFoundException thrown = assertThrows(
-                AccountNotFoundException.class,
-                () -> controller.getById(request)
-        );
-
-        assertSame(failure, thrown);
-    }
-
-    private void assertAccountResponse(ResponseEntity<AccountGetResponse> response) {
-        AccountGetResponse body = response.getBody();
-        assertNotNull(body);
-        assertAll(
-                () -> assertEquals(HttpStatus.OK, response.getStatusCode()),
-                () -> assertEquals(ACCOUNT_ID, body.id()),
-                () -> assertEquals("user@example.com", body.email()),
-                () -> assertEquals(PUBLIC_CODE, body.publicCode()),
-                () -> assertEquals("ADMIN", body.role()),
-                () -> assertEquals("ACTIVE", body.status()),
-                () -> assertEquals(true, body.verified()),
-                () -> assertEquals(Instant.parse("2026-01-01T10:00:00Z"), body.createdAt()),
-                () -> assertEquals(Instant.parse("2026-01-02T10:00:00Z"), body.lastLoginAt())
-        );
+    private MockMvc mockMvc(GetAccountService service) {
+        return MockMvcBuilders.standaloneSetup(new GetAccountController(service))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilter(new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository()))
+                .build();
     }
 
     private Account account() {

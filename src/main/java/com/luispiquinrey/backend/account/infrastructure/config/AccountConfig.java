@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 @Configuration
-public class AccountConfiguration {
+public class AccountConfig {
 
     @Bean
     @Profile("!test")

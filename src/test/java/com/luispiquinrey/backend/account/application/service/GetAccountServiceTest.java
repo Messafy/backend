@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.account.application.service;
 
 import com.luispiquinrey.backend.account.application.dto.AccountView;
+import com.luispiquinrey.backend.account.application.port.PasswordHasher;
 import com.luispiquinrey.backend.account.domain.exception.AccountNotFoundException;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
@@ -40,6 +41,9 @@ class GetAccountServiceTest {
 
     @Mock
     private AccountRepository repository;
+
+    @Mock
+    private PasswordHasher passwordHasher;
 
     @InjectMocks
     private GetAccountService service;
@@ -121,6 +125,70 @@ class GetAccountServiceTest {
         when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.empty());
 
         assertFalse(service.existsActiveAccount(ACCOUNT_ID));
+        verify(repository).findById(new UserId(ACCOUNT_ID));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupPublicCode")
+    void shouldFindActiveAccountIdByPublicCode() {
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(account()));
+
+        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
+
+        assertTrue(result.isPresent());
+        assertEquals(ACCOUNT_ID, result.get().id());
+        verify(repository).findByPublicCode(PUBLIC_CODE);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupPublicCode")
+    void shouldRejectMissingAccountByPublicCode() {
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
+
+        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
+
+        assertFalse(result.isPresent());
+        verify(repository).findByPublicCode(PUBLIC_CODE);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupPublicCode")
+    void shouldRejectDeletedAccountByPublicCode() {
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(deletedAccount()));
+
+        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
+
+        assertFalse(result.isPresent());
+        verify(repository).findByPublicCode(PUBLIC_CODE);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("matchesLockerPassword")
+    void shouldMatchLockerPassword() {
+        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.of(account()));
+        when(passwordHasher.matches("raw-locker-password", new EncodedPassword(ENCODED_LOCKER)))
+                .thenReturn(true);
+
+        boolean matches = service.matchesLockerPassword(new UserId(ACCOUNT_ID), "raw-locker-password");
+
+        assertTrue(matches);
+        verify(repository).findById(new UserId(ACCOUNT_ID));
+        verify(passwordHasher).matches("raw-locker-password", new EncodedPassword(ENCODED_LOCKER));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("matchesLockerPassword")
+    void shouldNotMatchLockerPasswordForMissingAccount() {
+        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.empty());
+
+        boolean matches = service.matchesLockerPassword(new UserId(ACCOUNT_ID), "raw-locker-password");
+
+        assertFalse(matches);
         verify(repository).findById(new UserId(ACCOUNT_ID));
     }
 

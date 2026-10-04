@@ -3,9 +3,7 @@ package com.luispiquinrey.backend.account.presentation.rest;
 import com.luispiquinrey.backend.account.application.dto.AccountView;
 import com.luispiquinrey.backend.account.application.service.GetAccountService;
 import com.luispiquinrey.backend.account.infrastructure.security.AccountUserDetails;
-import com.luispiquinrey.backend.account.presentation.dto.AccountGetRequest;
 import com.luispiquinrey.backend.account.presentation.dto.AccountGetResponse;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -33,9 +31,9 @@ public class GetAccountController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AccountGetResponse> getById(@Valid @RequestBody AccountGetRequest accountGetRequest) {
-        log.info("Received request to get account {}", accountGetRequest.id());
-        AccountView accountView = service.findById(accountGetRequest.id());
+    public ResponseEntity<AccountGetResponse> getById(@PathVariable String id) {
+        log.info("Received request to get account {}", id);
+        AccountView accountView = service.findById(id);
         log.info("Returning account {}", accountView.id());
         return ResponseEntity.ok(AccountGetResponse.from(accountView));
     }

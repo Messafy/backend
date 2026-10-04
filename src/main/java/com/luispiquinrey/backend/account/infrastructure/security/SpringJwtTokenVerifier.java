@@ -2,6 +2,7 @@ package com.luispiquinrey.backend.account.infrastructure.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -28,8 +29,12 @@ public class SpringJwtTokenVerifier implements JwtTokenVerifier {
 
     @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String email = extractEmail(token);
-        return email.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        try {
+            final String email = extractEmail(token);
+            return userDetails.getUsername().equals(email) && !isTokenExpired(token);
+        } catch (JwtException exception) {
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {
