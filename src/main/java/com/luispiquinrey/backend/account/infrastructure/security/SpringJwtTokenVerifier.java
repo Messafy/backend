@@ -4,6 +4,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,8 @@ import java.util.function.Function;
 
 @Component
 public class SpringJwtTokenVerifier implements JwtTokenVerifier {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringJwtTokenVerifier.class);
 
     private final SecretKey key;
 
@@ -31,8 +35,13 @@ public class SpringJwtTokenVerifier implements JwtTokenVerifier {
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
             final String email = extractEmail(token);
-            return userDetails.getUsername().equals(email) && !isTokenExpired(token);
+            boolean valid = userDetails.getUsername().equals(email) && !isTokenExpired(token);
+            if (!valid) {
+                log.debug("JWT validation failed for {}", userDetails.getUsername());
+            }
+            return valid;
         } catch (JwtException exception) {
+            log.debug("JWT validation failed: {}", exception.getMessage());
             return false;
         }
     }

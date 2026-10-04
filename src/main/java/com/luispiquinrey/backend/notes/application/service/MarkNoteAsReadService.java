@@ -6,10 +6,14 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MarkNoteAsReadService {
+
+    private static final Logger log = LoggerFactory.getLogger(MarkNoteAsReadService.class);
 
     private final NoteRepository repository;
 
@@ -18,6 +22,7 @@ public class MarkNoteAsReadService {
     }
 
     public Note markAsRead(String id, String accountId) {
+        log.debug("Marking note {} as read for account {}", id, accountId);
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
@@ -27,6 +32,7 @@ public class MarkNoteAsReadService {
 
         note.markAsRead();
         repository.save(note);
+        log.debug("Marked note {} as read", note.id().id());
         return note;
     }
 

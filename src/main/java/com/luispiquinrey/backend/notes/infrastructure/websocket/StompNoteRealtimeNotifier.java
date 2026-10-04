@@ -5,6 +5,8 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.PrivateNote;
 import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,8 @@ import java.util.List;
 
 @Component
 public class StompNoteRealtimeNotifier implements NoteRealtimeNotifier {
+
+    private static final Logger log = LoggerFactory.getLogger(StompNoteRealtimeNotifier.class);
 
     private static final String DESTINATION = "/queue/notes";
 
@@ -24,6 +28,7 @@ public class StompNoteRealtimeNotifier implements NoteRealtimeNotifier {
 
     @Override
     public void notifySharedNote(Note note, String recipientAccountId) {
+        log.debug("Notifying account {} about shared note {}", recipientAccountId, note.id().id());
         messagingTemplate.convertAndSendToUser(
                 recipientAccountId,
                 DESTINATION,

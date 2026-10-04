@@ -4,6 +4,8 @@ import com.luispiquinrey.backend.account.application.port.TokenIssuer;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,8 @@ import java.util.Date;
 
 @Component
 public class SpringJwtTokenIssuer implements TokenIssuer {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringJwtTokenIssuer.class);
 
     private static final long TOKEN_EXPIRATION_MILLIS = 1000L * 60 * 60 * 24;
 
@@ -24,6 +28,7 @@ public class SpringJwtTokenIssuer implements TokenIssuer {
 
     @Override
     public String issue(Account account) {
+        log.debug("Issuing JWT for account {}", account.id().id());
 
         return Jwts.builder()
                 .subject(account.id().id())

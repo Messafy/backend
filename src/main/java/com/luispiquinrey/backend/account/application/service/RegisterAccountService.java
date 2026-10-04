@@ -14,10 +14,14 @@ import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.events.DomainEventPublisher;
 import com.luispiquinrey.backend.share.identity.UserId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RegisterAccountService {
+
+    private static final Logger log = LoggerFactory.getLogger(RegisterAccountService.class);
 
     private final AccountRepository accountRepository;
     private final PasswordHasher passwordHasher;
@@ -44,6 +48,8 @@ public class RegisterAccountService {
             throw new IllegalArgumentException("register command cannot be null");
         }
 
+        log.debug("Registering account for {}", command.email());
+
         if (command.rawPassword() == null || command.rawPassword().isBlank()) {
             throw new IllegalArgumentException("raw password cannot be blank");
         }
@@ -61,6 +67,8 @@ public class RegisterAccountService {
                 .build();
 
         accountRepository.save(account);
+
+        log.debug("Registered account {}", account.id().id());
 
         domainEventPublisher.publish(new AccountRegistered(account.id().id(), account.email().email()));
 

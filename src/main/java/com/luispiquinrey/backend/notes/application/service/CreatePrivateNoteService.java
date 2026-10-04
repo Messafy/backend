@@ -7,12 +7,16 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class CreatePrivateNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(CreatePrivateNoteService.class);
 
     private final NoteRepository repository;
     private final NoteIdGenerator idGenerator;
@@ -32,6 +36,7 @@ public class CreatePrivateNoteService {
         }
 
         String noteId = idGenerator.nextId();
+        log.debug("Creating private note {} for account {}", noteId, authenticatedAccountId);
         List<Tag> tags = command.tags() == null
                 ? List.of()
                 : command.tags().stream().map(Tag::new).toList();
@@ -44,6 +49,7 @@ public class CreatePrivateNoteService {
                 tags
         );
         repository.save(note);
+        log.debug("Created private note {}", note.id().id());
         return note;
     }
 }

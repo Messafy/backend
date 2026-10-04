@@ -8,10 +8,14 @@ import com.luispiquinrey.backend.account.domain.exception.AccountPasswordMismatc
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class LoginAccountService {
+
+    private static final Logger log = LoggerFactory.getLogger(LoginAccountService.class);
 
     private final PasswordHasher passwordHasher;
     private final TokenIssuer tokenIssuer;
@@ -33,6 +37,7 @@ public class LoginAccountService {
         }
 
         Email email = new Email(command.email());
+        log.debug("Authenticating account for {}", email.email());
         Account account = getAccountByEmail(email.email());
 
         if (!passwordHasher.matches(command.rawPassword(), account.encodedPassword())) {
@@ -41,6 +46,8 @@ public class LoginAccountService {
 
         account.login();
         accountRepository.save(account);
+
+        log.debug("Authenticated account {}", account.id().id());
 
         return tokenIssuer.issue(account);
     }

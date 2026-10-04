@@ -5,6 +5,8 @@ import com.luispiquinrey.backend.account.domain.exception.AccountVerificationTok
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,8 @@ import java.util.Date;
 
 @Component
 public class SpringJwtVerificationTokenCodec implements VerificationTokenCodec {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringJwtVerificationTokenCodec.class);
 
     private static final long VERIFICATION_TOKEN_EXPIRATION_MILLIS = 1000L * 60 * 60 * 24;
 
@@ -25,6 +29,7 @@ public class SpringJwtVerificationTokenCodec implements VerificationTokenCodec {
 
     @Override
     public String issue(String accountId) {
+        log.debug("Issuing verification token for account {}", accountId);
         return Jwts.builder()
                 .subject(accountId)
                 .issuedAt(new Date())
@@ -36,13 +41,16 @@ public class SpringJwtVerificationTokenCodec implements VerificationTokenCodec {
     @Override
     public String extractAccountId(String rawToken) {
         try {
-            return Jwts.parser()
+            String accountId = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(rawToken)
                     .getPayload()
                     .getSubject();
+            log.debug("Extracted account {} from verification token", accountId);
+            return accountId;
         } catch (JwtException | IllegalArgumentException e) {
+            log.debug("Verification token is invalid or expired: {}", e.getMessage());
             throw new AccountVerificationTokenException("verification token is invalid or expired");
         }
     }

@@ -4,10 +4,14 @@ import com.luispiquinrey.backend.account.api.AccountRegistered;
 import com.luispiquinrey.backend.account.api.VerificationTokenIssuer;
 import com.luispiquinrey.backend.notify.application.port.in.SendVerificationEmailUseCase;
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SendVerificationEmailService implements SendVerificationEmailUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(SendVerificationEmailService.class);
 
     private final MailSender mailSender;
     private final VerificationTokenIssuer verificationTokenIssuer;
@@ -19,6 +23,7 @@ public class SendVerificationEmailService implements SendVerificationEmailUseCas
 
     @Override
     public void handle(AccountRegistered event) {
+        log.debug("Sending verification email for account {}", event.accountId());
         String token = verificationTokenIssuer.issue(event.accountId());
         String link = "http://localhost:8080/v1/auth/verify?token=" + token;
         mailSender.send(
@@ -71,5 +76,6 @@ public class SendVerificationEmailService implements SendVerificationEmailUseCas
                 """
                         .replace("__LINK__", link)
         );
+        log.debug("Verification email queued for account {}", event.accountId());
     }
 }

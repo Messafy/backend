@@ -13,10 +13,14 @@ import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.PrivateNote;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ShareNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(ShareNoteService.class);
 
     private final NoteRepository repository;
     private final AccountLookup accountLookup;
@@ -44,6 +48,7 @@ public class ShareNoteService {
             throw new NoteValidationException("recipient locker password cannot be blank");
         }
 
+        log.debug("Sharing note {} for account {}", id, authenticatedAccountId);
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
@@ -81,6 +86,7 @@ public class ShareNoteService {
 
         repository.delete(privateNote);
         repository.save(sharedNote);
+        log.debug("Shared note {} with account {}", sharedNote.id().id(), recipientId.id());
         realtimeNotifier.notifySharedNote(sharedNote, recipientId.id());
 
         return sharedNote;

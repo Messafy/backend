@@ -5,10 +5,14 @@ import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DeleteNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(DeleteNoteService.class);
 
     private final NoteRepository repository;
 
@@ -17,6 +21,7 @@ public class DeleteNoteService {
     }
 
     public void delete(String id, String authenticatedAccountId) {
+        log.debug("Deleting note {} for account {}", id, authenticatedAccountId);
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
@@ -26,5 +31,6 @@ public class DeleteNoteService {
 
         note.delete();
         repository.save(note);
+        log.debug("Deleted note {}", note.id().id());
     }
 }

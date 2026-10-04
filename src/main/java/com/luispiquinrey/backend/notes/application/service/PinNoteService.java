@@ -8,10 +8,14 @@ import com.luispiquinrey.backend.notes.domain.exception.NoteValidationException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PinNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(PinNoteService.class);
 
     private final NoteRepository repository;
 
@@ -24,6 +28,7 @@ public class PinNoteService {
             throw new NoteValidationException("note pin data cannot be null");
         }
 
+        log.debug("Setting pinned={} on note {} for account {}", command.pinned(), id, authenticatedAccountId);
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
@@ -36,6 +41,7 @@ public class PinNoteService {
 
         note.setPinned(command.pinned());
         repository.save(note);
+        log.debug("Set pinned={} on note {}", command.pinned(), note.id().id());
         return note;
     }
 }

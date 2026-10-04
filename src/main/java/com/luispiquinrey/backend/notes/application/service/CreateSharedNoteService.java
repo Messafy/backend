@@ -10,12 +10,16 @@ import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class CreateSharedNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(CreateSharedNoteService.class);
 
     private final NoteRepository repository;
     private final AccountLookup accountLookup;
@@ -59,6 +63,7 @@ public class CreateSharedNoteService {
         }
 
         String noteId = idGenerator.nextId();
+        log.debug("Creating shared note {} for account {}", noteId, authenticatedAccountId);
         List<Tag> tags = command.tags() == null
                 ? List.of()
                 : command.tags().stream().map(Tag::new).toList();
@@ -72,6 +77,7 @@ public class CreateSharedNoteService {
                 tags
         );
         repository.save(note);
+        log.debug("Created shared note {} for recipient {}", note.id().id(), recipientId.id());
         realtimeNotifier.notifySharedNote(note, recipientId.id());
         return note;
     }

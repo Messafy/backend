@@ -10,10 +10,14 @@ import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UpdateNoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(UpdateNoteService.class);
 
     private final NoteRepository repository;
 
@@ -26,6 +30,7 @@ public class UpdateNoteService {
             throw new NoteValidationException("note update data cannot be null");
         }
 
+        log.debug("Updating note {} for account {}", id, authenticatedAccountId);
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
@@ -43,6 +48,7 @@ public class UpdateNoteService {
             note.replaceTags(command.tags().stream().map(Tag::new).toList());
         }
         repository.save(note);
+        log.debug("Updated note {}", note.id().id());
         return note;
     }
 }

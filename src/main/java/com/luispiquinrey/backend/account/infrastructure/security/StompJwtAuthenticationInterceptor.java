@@ -1,6 +1,8 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(StompJwtAuthenticationInterceptor.class);
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -43,9 +47,11 @@ public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
 
         if (!jwtTokenVerifier.isTokenValid(token, userDetails)
                 || !(userDetails instanceof AuthenticatedUser authenticatedUser)) {
+            log.debug("WebSocket authentication failed for {}", email);
             throw new MessagingException("invalid WebSocket authentication");
         }
 
+        log.debug("Authenticated WebSocket user {}", authenticatedUser.accountId());
         accessor.setUser(new UsernamePasswordAuthenticationToken(
                 authenticatedUser.accountId(),
                 null,

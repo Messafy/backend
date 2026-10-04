@@ -10,6 +10,8 @@ import com.luispiquinrey.backend.account.domain.model.Role;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -18,8 +20,11 @@ import java.util.Objects;
 @Component
 public class AccountMapper {
 
+    private static final Logger log = LoggerFactory.getLogger(AccountMapper.class);
+
     public Account toDomain(AccountDocument accountDocument) {
         Objects.requireNonNull(accountDocument, "accountDocument cannot be null");
+        log.debug("Mapping account document {} to domain", accountDocument.getId());
 
         return new Account.AccountBuilder()
                 .id(accountDocument.getId() == null ? null : new UserId(accountDocument.getId().toString()))
@@ -37,6 +42,7 @@ public class AccountMapper {
 
     public AccountDocument toDocument(Account account) {
         Objects.requireNonNull(account, "account cannot be null");
+        log.debug("Mapping account {} to MongoDB document", account.id().id());
 
         return new AccountDocument(
                 toObjectId(account.id().id()),

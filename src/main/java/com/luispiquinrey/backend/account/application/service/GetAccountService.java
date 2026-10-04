@@ -8,12 +8,16 @@ import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
 public class GetAccountService implements AccountLookup {
+
+    private static final Logger log = LoggerFactory.getLogger(GetAccountService.class);
 
     private final AccountRepository accountRepository;
     private final PasswordHasher passwordHasher;
@@ -62,6 +66,7 @@ public class GetAccountService implements AccountLookup {
     }
 
     private AccountView findOrFail(UserId id) {
+        log.debug("Loading account {}", id.id());
         return accountRepository.findById(id)
                 .map(AccountView::from)
                 .orElseThrow(() -> new AccountNotFoundException(id.id()));
