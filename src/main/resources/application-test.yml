@@ -17,6 +17,18 @@ logging:
     root: WARN
     com.luispiquinrey.backend: INFO
 
+management:
+  opentelemetry:
+    enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-components: always
+      show-details: always
+
 security:
   user:
     password: ${USER_TEST_PASSWORD:test}

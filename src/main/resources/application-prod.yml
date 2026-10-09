@@ -34,3 +34,36 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: never
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  observations:
+    annotations:
+      enabled: true
+  opentelemetry:
+    resource-attributes:
+      service.name: ghost-notes-backend
+      service.namespace: messafy
+      service.version: ${OTEL_SERVICE_VERSION:1.0.0}
+      deployment.environment.name: production
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://grafana-otel-lgtm:4318/v1/traces}
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:http://grafana-otel-lgtm:4318/v1/logs}
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://grafana-otel-lgtm:4318/v1/metrics}
