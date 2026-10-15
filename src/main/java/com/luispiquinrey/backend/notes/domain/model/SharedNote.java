@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.notes.domain.model;
 
 import com.luispiquinrey.backend.share.identity.UserId;
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.share.time.Date;
 
 import java.util.List;
@@ -70,6 +71,16 @@ public class SharedNote extends Note {
 
     public boolean isSharedWith(String ownerId) {
         return this.sharedWith.equals(new SharedWith(ownerId));
+    }
+
+    @Override
+    public boolean canAccess(String accountId) {
+        return accountId != null && (isOwnedBy(accountId) || isSharedWith(accountId));
+    }
+
+    @Override
+    protected void ensureEditable() {
+        throw new NoteConflictException("shared notes cannot be edited after they are sent");
     }
 
     @Override

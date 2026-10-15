@@ -14,14 +14,13 @@ import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.events.DomainEventPublisher;
 import com.luispiquinrey.backend.share.identity.UserId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class RegisterAccountService {
 
-    private static final Logger log = LoggerFactory.getLogger(RegisterAccountService.class);
+    private final Logger log;
 
     private final AccountRepository accountRepository;
     private final PasswordHasher passwordHasher;
@@ -34,13 +33,15 @@ public class RegisterAccountService {
             PasswordHasher passwordHasher,
             DomainEventPublisher domainEventPublisher,
             AccountIdGenerator accountIdGenerator,
-            PublicCodeGenerator publicCodeGenerator
+            PublicCodeGenerator publicCodeGenerator,
+            Logger log
     ) {
         this.accountRepository = accountRepository;
         this.passwordHasher = passwordHasher;
         this.domainEventPublisher = domainEventPublisher;
         this.accountIdGenerator = accountIdGenerator;
         this.publicCodeGenerator = publicCodeGenerator;
+        this.log = log;
     }
 
     public AccountView register(RegisterAccountCommand command) {

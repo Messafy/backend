@@ -4,21 +4,20 @@ import com.luispiquinrey.backend.notes.domain.exception.NoteAccessDeniedExceptio
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
-import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class MarkNoteAsReadService {
 
-    private static final Logger log = LoggerFactory.getLogger(MarkNoteAsReadService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
 
-    public MarkNoteAsReadService(NoteRepository repository) {
+    public MarkNoteAsReadService(NoteRepository repository, Logger log) {
         this.repository = repository;
+        this.log = log;
     }
 
     public Note markAsRead(String id, String accountId) {
@@ -26,7 +25,7 @@ public class MarkNoteAsReadService {
         Note note = repository.findById(new NoteId(id))
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
-        if (!canAccess(note, accountId)) {
+        if (!note.canAccess(accountId)) {
             throw new NoteAccessDeniedException("only the owner or the shared recipient can mark a note as read");
         }
 
@@ -36,8 +35,4 @@ public class MarkNoteAsReadService {
         return note;
     }
 
-    private boolean canAccess(Note note, String accountId) {
-        return note.isOwnedBy(accountId)
-                || note instanceof SharedNote sharedNote && sharedNote.isSharedWith(accountId);
-    }
 }

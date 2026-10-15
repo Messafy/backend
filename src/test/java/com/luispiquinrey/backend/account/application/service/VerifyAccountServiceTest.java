@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.account.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.account.application.port.VerificationTokenCodec;
 import com.luispiquinrey.backend.account.domain.exception.AccountNotFoundException;
@@ -31,6 +32,9 @@ class VerifyAccountServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private VerifyAccountService service;

@@ -2,25 +2,24 @@ package com.luispiquinrey.backend.notes.application.service;
 
 import com.luispiquinrey.backend.notes.application.dto.PinNoteCommand;
 import com.luispiquinrey.backend.notes.domain.exception.NoteAccessDeniedException;
-import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteValidationException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class PinNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(PinNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
 
-    public PinNoteService(NoteRepository repository) {
+    public PinNoteService(NoteRepository repository, Logger log) {
         this.repository = repository;
+        this.log = log;
     }
 
     public Note setPinned(String id, PinNoteCommand command, String authenticatedAccountId) {
@@ -34,9 +33,6 @@ public class PinNoteService {
 
         if (!note.isOwnedBy(authenticatedAccountId)) {
             throw new NoteAccessDeniedException("you cannot pin this note");
-        }
-        if (note.status().isFinal()) {
-            throw new NoteConflictException("deleted notes cannot be pinned");
         }
 
         note.setPinned(command.pinned());

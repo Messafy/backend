@@ -33,7 +33,7 @@ public class NoteIdTest {
     @Test
     @Timeout(1)
     @Tag("noteId")
-    void shouldThrowWhenNoteIdIsInvalid() {
-        Assertions.assertThrows(IllegalArgumentException.class, () -> new NoteId("invalid"));
+    void shouldAcceptOpaqueIdIndependentOfStorage() {
+        Assertions.assertEquals("note-1", new NoteId("note-1").id());
     }
 }

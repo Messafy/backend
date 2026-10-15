@@ -6,21 +6,21 @@ import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.exception.AccountNotFoundException;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class VerifyAccountService implements VerificationTokenIssuer {
 
-    private static final Logger log = LoggerFactory.getLogger(VerifyAccountService.class);
+    private final Logger log;
 
     private final VerificationTokenCodec verificationTokenCodec;
     private final AccountRepository accountRepository;
 
-    public VerifyAccountService(VerificationTokenCodec verificationTokenCodec, AccountRepository accountRepository) {
+    public VerifyAccountService(VerificationTokenCodec verificationTokenCodec, AccountRepository accountRepository, Logger log) {
         this.verificationTokenCodec = verificationTokenCodec;
         this.accountRepository = accountRepository;
+        this.log = log;
     }
 
     @Override

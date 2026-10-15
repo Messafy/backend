@@ -1,6 +1,4 @@
 spring:
-  config:
-    import: optional:classpath:.env[.properties]
   main:
     log-startup-info: true
   application:
@@ -12,26 +10,33 @@ spring:
     database: privatenotes
   output:
     ansi:
-      enabled: ALWAYS
+      enabled: DETECT
+  mvc:
+    log-request-details: false
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${EMAIL_USERNAME}
-    password: ${EMAIL_PASSWORD}
+    port: 465
     properties:
       mail:
         smtp:
           auth: true
-          starttls:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          ssl:
             enable: true
+          starttls:
+            enable: false
 app:
-  frontend-url: http://localhost:5173
+  frontend-url: ${APP_FRONTEND_URL}
+  public-base-url: ${APP_PUBLIC_BASE_URL}
 server:
   port: 8080
 security:
   jwt:
-    secret: ${JWT_SECRET:9f3c6e2a7b4d8f1c5a0e9d3b7c6f2a1e8d4b9c0f7a5e3d2c1b6f8a4e9d7c2b5}
+    secret: ${JWT_SECRET}
 logging:
   level:
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
-    org.springframework.web: DEBUG
+    root: INFO
+    com.luispiquinrey.backend: INFO
+    org.springframework.data.mongodb.core.MongoTemplate: WARN
+    org.springframework.web: WARN

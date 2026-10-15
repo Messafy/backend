@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.notes.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
@@ -27,6 +28,9 @@ class DeleteNoteServiceTest {
 
     @Mock
     private NoteRepository repository;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private DeleteNoteService service;

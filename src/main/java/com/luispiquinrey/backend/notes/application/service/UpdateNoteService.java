@@ -2,27 +2,25 @@ package com.luispiquinrey.backend.notes.application.service;
 
 import com.luispiquinrey.backend.notes.application.dto.UpdateNoteCommand;
 import com.luispiquinrey.backend.notes.domain.exception.NoteAccessDeniedException;
-import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteValidationException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
-import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class UpdateNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(UpdateNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
 
-    public UpdateNoteService(NoteRepository repository) {
+    public UpdateNoteService(NoteRepository repository, Logger log) {
         this.repository = repository;
+        this.log = log;
     }
 
     public Note update(String id, UpdateNoteCommand command, String authenticatedAccountId) {
@@ -36,10 +34,6 @@ public class UpdateNoteService {
 
         if (!note.isOwnedBy(authenticatedAccountId)) {
             throw new NoteAccessDeniedException("you cannot update this note");
-        }
-
-        if (note instanceof SharedNote) {
-            throw new NoteConflictException("shared notes cannot be edited after they are sent");
         }
 
         note.rename(command.title());

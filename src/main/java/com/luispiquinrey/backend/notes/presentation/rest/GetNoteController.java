@@ -3,7 +3,6 @@ package com.luispiquinrey.backend.notes.presentation.rest;
 import com.luispiquinrey.backend.notes.application.service.GetNoteService;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
-import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.presentation.dto.NoteGetResponse;
 import com.luispiquinrey.backend.notes.presentation.dto.NotesByOwnerAndSharedWithRequest;
 import com.luispiquinrey.backend.notes.presentation.dto.NotesByOwnerRequest;
@@ -75,8 +74,7 @@ public class GetNoteController {
     ) {
         String safeId = sanitizeForLog(id);
         log.info("Received request to get note {}", safeId);
-        Optional<Note> note = service.findById(id)
-                .filter(found -> canAccess(found, authenticatedUser.accountId()));
+        Optional<Note> note = service.findById(id, authenticatedUser.accountId());
         if (note.isEmpty()) {
             log.info("Note {} was not found", safeId);
         }
@@ -120,9 +118,8 @@ public class GetNoteController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
         log.info("Received request to list notes with status {}", status);
-        List<NoteGetResponse> body = service.findByStatus(status)
+        List<NoteGetResponse> body = service.findByStatus(status, authenticatedUser.accountId())
                 .stream()
-                .filter(note -> canAccess(note, authenticatedUser.accountId()))
                 .map(NoteGetResponse::from)
                 .toList();
         log.info("Returning {} notes with status {}", body.size(), status);
@@ -262,8 +259,4 @@ public class GetNoteController {
         return ResponseEntity.ok(body);
     }
 
-    private boolean canAccess(Note note, String accountId) {
-        return note.isOwnedBy(accountId)
-                || note instanceof SharedNote sharedNote && sharedNote.isSharedWith(accountId);
-    }
 }

@@ -9,9 +9,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.MailSendException;
+import com.luispiquinrey.backend.notify.application.exception.MailDeliveryException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 class SmtpMailSenderTest {
 
@@ -22,9 +29,11 @@ class SmtpMailSenderTest {
     @Timeout(3)
     @Tag("smtpMailSender")
     void shouldSendHtmlEmailThroughSmtp() throws Exception {
-        SmtpMailSender sender = new SmtpMailSender(javaMailSender(), "noreply@messafy.com");
+        String template = new org.springframework.core.io.ClassPathResource("mail/verification.html")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        SmtpMailSender sender = new SmtpMailSender(javaMailSender(), "noreply@messafy.com", "https://api.example.com", template);
 
-        sender.send("user@example.com", "Welcome to Messafy", "<h1>Welcome</h1>");
+        sender.sendVerification("user@example.com", "token+with&symbols");
 
         MimeMessage[] messages = greenMail.getReceivedMessages();
         assertEquals(1, messages.length);
@@ -33,7 +42,7 @@ class SmtpMailSenderTest {
         assertEquals("user@example.com", message.getRecipients(Message.RecipientType.TO)[0].toString());
         assertEquals("Welcome to Messafy", message.getSubject());
         assertTrue(message.getContentType().contains("text/html"));
-        assertEquals("<h1>Welcome</h1>", message.getContent());
+        assertTrue(message.getContent().toString().contains("https://api.example.com/v1/auth/verify?token=token%2Bwith%26symbols"));
     }
 
     private JavaMailSenderImpl javaMailSender() {
@@ -41,5 +50,17 @@ class SmtpMailSenderTest {
         sender.setHost("127.0.0.1");
         sender.setPort(greenMail.getSmtp().getPort());
         return sender;
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("smtpMailSender")
+    void wrapsTechnicalDeliveryFailure() {
+        JavaMailSender transport = mock(JavaMailSender.class);
+        MimeMessage message = new MimeMessage(jakarta.mail.Session.getInstance(new java.util.Properties()));
+        when(transport.createMimeMessage()).thenReturn(message);
+        doThrow(new MailSendException("SMTP unavailable")).when(transport).send(message);
+        var sender = new SmtpMailSender(transport, "noreply@example.com", "https://api.example.com", "__LINK__");
+        assertThrows(MailDeliveryException.class, () -> sender.sendVerification("user@example.com", "token"));
     }
 }

@@ -5,19 +5,19 @@ import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class DeleteNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(DeleteNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
 
-    public DeleteNoteService(NoteRepository repository) {
+    public DeleteNoteService(NoteRepository repository, Logger log) {
         this.repository = repository;
+        this.log = log;
     }
 
     public void delete(String id, String authenticatedAccountId) {

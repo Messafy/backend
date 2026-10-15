@@ -2,7 +2,8 @@ package com.luispiquinrey.backend.account.presentation.rest;
 
 import com.luispiquinrey.backend.account.application.dto.AccountView;
 import com.luispiquinrey.backend.account.application.service.GetAccountService;
-import com.luispiquinrey.backend.account.infrastructure.security.AccountUserDetails;
+import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
+import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.account.presentation.dto.AccountGetResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -59,9 +60,9 @@ public class GetAccountController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = ProblemDetail.class)))})
     @GetMapping("/me")
-    public ResponseEntity<AccountGetResponse> me(@AuthenticationPrincipal AccountUserDetails principal) {
+    public ResponseEntity<AccountGetResponse> me(@AuthenticationPrincipal AuthenticatedUser principal) {
         log.info("Received request to get current account");
-        AccountView accountView = service.getMyAccount(principal.account().id());
+        AccountView accountView = service.getMyAccount(new UserId(principal.accountId()));
         log.info("Returning current account {}", accountView.id());
         return ResponseEntity.ok(AccountGetResponse.from(accountView));
     }

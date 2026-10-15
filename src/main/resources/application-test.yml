@@ -1,6 +1,6 @@
 spring:
   mvc:
-    log-request-details: true
+    log-request-details: false
   config:
     activate:
       on-profile: test
@@ -20,6 +20,10 @@ logging:
 management:
   opentelemetry:
     enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
   endpoints:
     web:
       exposure:
@@ -30,9 +34,15 @@ management:
       show-details: always
 
 security:
+  jwt:
+    secret: test-only-signing-key-not-for-production-0123456789abcdef
   user:
-    password: ${USER_TEST_PASSWORD:test}
-    username: ${USER_TEST_USERNAME:{noop}luispiquinrey}
+    password: "{noop}${USER_TEST_PASSWORD:test}"
+    username: ${USER_TEST_USERNAME:luispiquinrey}
+
+app:
+  frontend-url: http://localhost:5173
+  public-base-url: http://localhost:8080
 
 de:
   flapdoodle:

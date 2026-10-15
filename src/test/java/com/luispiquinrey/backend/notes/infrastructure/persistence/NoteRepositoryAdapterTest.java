@@ -190,14 +190,14 @@ class NoteRepositoryAdapterTest {
         SharedNoteDocument document = sharedDocument();
         Note note = sharedNote();
 
-        when(sharedRepository.findAllByStatusAndSharedWith("NEW", "507f1f77bcf86cd799439013"))
+        when(sharedRepository.findAllByStatusInAndSharedWith(List.of("NEW", "READ"), "507f1f77bcf86cd799439013"))
                 .thenReturn(List.of(document));
         when(mapper.toDomain(document)).thenReturn(note);
 
         List<Note> result = repository.findActiveBySharedWith("507f1f77bcf86cd799439013");
 
         assertEquals(List.of(note), result);
-        verify(sharedRepository).findAllByStatusAndSharedWith("NEW", "507f1f77bcf86cd799439013");
+        verify(sharedRepository).findAllByStatusInAndSharedWith(List.of("NEW", "READ"), "507f1f77bcf86cd799439013");
     }
 
     @Test
@@ -207,8 +207,8 @@ class NoteRepositoryAdapterTest {
         SharedNoteDocument document = sharedDocument();
         Note note = sharedNote();
 
-        when(sharedRepository.findAllByStatusAndOwnerIdAndSharedWith(
-                "NEW",
+        when(sharedRepository.findAllByStatusInAndOwnerIdAndSharedWith(
+                List.of("NEW", "READ"),
                 "507f1f77bcf86cd799439012",
                 "507f1f77bcf86cd799439013"
         )).thenReturn(List.of(document));
@@ -220,8 +220,8 @@ class NoteRepositoryAdapterTest {
         );
 
         assertEquals(List.of(note), result);
-        verify(sharedRepository).findAllByStatusAndOwnerIdAndSharedWith(
-                "NEW",
+        verify(sharedRepository).findAllByStatusInAndOwnerIdAndSharedWith(
+                List.of("NEW", "READ"),
                 "507f1f77bcf86cd799439012",
                 "507f1f77bcf86cd799439013"
         );
@@ -291,21 +291,8 @@ class NoteRepositoryAdapterTest {
         );
         note.delete();
 
-        PrivateNoteDocument document = new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "NEW",
-                note.createdAt().value().toString(),
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.of(document));
+        PrivateNoteDocument document = (PrivateNoteDocument) new NoteMapper().toDocument(note);
+        when(mapper.toDocument(note)).thenReturn(document);
 
         repository.save(note);
 
@@ -336,10 +323,6 @@ class NoteRepositoryAdapterTest {
                 null,
                 "507f1f77bcf86cd799439012"
         );
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.empty());
         when(mapper.toDocument(note)).thenReturn(document);
 
         repository.save(note);
@@ -390,11 +373,8 @@ class NoteRepositoryAdapterTest {
     void shouldUpdateStatusAndReadAtWhenNoteIsSaved() {
         Note note = privateNote();
         note.markAsRead();
-        PrivateNoteDocument document = privateDocument("NEW", null);
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.of(document));
+        PrivateNoteDocument document = (PrivateNoteDocument) new NoteMapper().toDocument(note);
+        when(mapper.toDocument(note)).thenReturn(document);
 
         repository.save(note);
 
@@ -410,10 +390,6 @@ class NoteRepositoryAdapterTest {
         Note note = privateNote();
         note.markAsRead();
         PrivateNoteDocument document = privateDocument("READ", note.readAt().value().toString());
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.empty());
         when(mapper.toDocument(note)).thenReturn(document);
 
         repository.save(note);

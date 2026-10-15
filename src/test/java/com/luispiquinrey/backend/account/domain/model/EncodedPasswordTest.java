@@ -33,27 +33,24 @@ public class EncodedPasswordTest {
     @Test
     @Timeout(1)
     @Tag("encodedPassword")
-    void shouldRejectNonBcryptEncodedPassword() {
-        Assertions.assertThrows(IllegalArgumentException.class, () -> new EncodedPassword("encoded-password"));
+    void shouldAcceptAnotherHashAlgorithm() {
+        Assertions.assertDoesNotThrow(() -> new EncodedPassword("$argon2id$v=19$m=65536,t=3,p=1$salt$hash"));
     }
 
     @Test
     @Timeout(1)
     @Tag("encodedPassword")
-    void shouldRejectBcryptWithUnknownVersion() {
+    void shouldRejectWhitespaceOnly() {
         Assertions.assertThrows(
                 IllegalArgumentException.class,
-                () -> new EncodedPassword("$2z$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
+                () -> new EncodedPassword(" \t")
         );
     }
 
     @Test
     @Timeout(1)
     @Tag("encodedPassword")
-    void shouldRejectBcryptWithInvalidLength() {
-        Assertions.assertThrows(
-                IllegalArgumentException.class,
-                () -> new EncodedPassword("$2a$10$short")
-        );
+    void shouldPreserveEncodedValue() {
+        Assertions.assertEquals(VALID_BCRYPT, new EncodedPassword(VALID_BCRYPT).value());
     }
 }

@@ -5,23 +5,12 @@ spring:
   docker:
     compose:
       enabled: false
-  data:
-    mongodb:
-      auto-index-creation: true
   mongodb:
     uri: ${MONGO_URI}
-    database: privatenotes
   mail:
     host: smtp.gmail.com
-    port: 465
     username: ${EMAIL_USERNAME}
     password: ${EMAIL_PASSWORD}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: true
   output:
     ansi:
       enabled: NEVER

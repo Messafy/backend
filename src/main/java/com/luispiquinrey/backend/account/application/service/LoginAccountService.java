@@ -8,23 +8,23 @@ import com.luispiquinrey.backend.account.domain.exception.AccountPasswordMismatc
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class LoginAccountService {
 
-    private static final Logger log = LoggerFactory.getLogger(LoginAccountService.class);
+    private final Logger log;
 
     private final PasswordHasher passwordHasher;
     private final TokenIssuer tokenIssuer;
     private final AccountRepository accountRepository;
 
-    public LoginAccountService(PasswordHasher passwordHasher, TokenIssuer tokenIssuer, AccountRepository accountRepository) {
+    public LoginAccountService(PasswordHasher passwordHasher, TokenIssuer tokenIssuer, AccountRepository accountRepository, Logger log) {
         this.passwordHasher = passwordHasher;
         this.tokenIssuer = tokenIssuer;
         this.accountRepository = accountRepository;
+        this.log = log;
     }
 
     public String login(LoginAccountCommand command) {

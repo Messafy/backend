@@ -7,10 +7,6 @@ import org.junit.jupiter.api.Timeout;
 
 import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 
-/*
- * This class also integrates the tests for behavior inherited from the abstract Note class.
- * They are kept here to avoid duplicating the same abstract note behavior checks in SharedNoteTest.
- */
 public class PrivateNoteTest {
     private final NoteFactory noteFactory = new NoteFactory();
     private final String noteId = "507f1f77bcf86cd799439011";

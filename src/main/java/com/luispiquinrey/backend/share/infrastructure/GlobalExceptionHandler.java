@@ -76,13 +76,10 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
-        log.warn(
-                "Request failed because the current state is invalid: {}",
-                ex.getMessage()
-        );
+        log.error("Request failed because of an internal state error", ex);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.CONFLICT,
-                ex.getMessage()
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An internal error occurred"
         );
         problem.setProperty("timestamp", userTime());
         return problem;

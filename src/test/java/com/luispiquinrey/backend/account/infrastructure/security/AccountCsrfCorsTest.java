@@ -24,11 +24,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(RegisterAccountController.class)
+@WebMvcTest(controllers = RegisterAccountController.class,
+        properties = "app.frontend-url=https://notes.example.test")
 @Import(TestSecurityConfig.class)
 class AccountCsrfCorsTest {
 
-    private static final String FRONTEND_ORIGIN = "http://localhost:5173";
+    private static final String FRONTEND_ORIGIN = "https://notes.example.test";
     private static final String UNTRUSTED_ORIGIN = "http://evil.example.com";
 
     @Autowired

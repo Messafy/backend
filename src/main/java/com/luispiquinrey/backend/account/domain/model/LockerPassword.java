@@ -19,9 +19,6 @@ public record LockerPassword(String value) {
         if (value.isBlank()) {
             throw new IllegalArgumentException("locker password encoded value cannot be blank");
         }
-        if (!EncodedPassword.BCRYPT_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("locker password must be BCrypt encoded");
-        }
     }
 
     public static void validateRaw(String raw) {

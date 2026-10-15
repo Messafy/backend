@@ -7,8 +7,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.regex.Pattern;
+
 @Component
 public class SpringBcryptPasswordHasher implements PasswordHasher {
+
+    private static final Pattern BCRYPT =
+            Pattern.compile("^(?:\\{bcrypt\\})?\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
 
     private static final Logger log = LoggerFactory.getLogger(SpringBcryptPasswordHasher.class);
 
@@ -21,12 +26,17 @@ public class SpringBcryptPasswordHasher implements PasswordHasher {
     @Override
     public EncodedPassword hash(String rawPassword) {
         log.debug("Hashing password");
-        return new EncodedPassword(passwordEncoder.encode(rawPassword));
+        String encoded = passwordEncoder.encode(rawPassword);
+        if (encoded == null || !BCRYPT.matcher(encoded).matches()) {
+            throw new IllegalStateException("password encoder did not return a BCrypt hash");
+        }
+        return new EncodedPassword(encoded);
     }
 
     @Override
     public boolean matches(String rawPassword, EncodedPassword encodedPassword) {
         log.debug("Verifying password match");
-        return passwordEncoder.matches(rawPassword, encodedPassword.value());
+        return encodedPassword != null && BCRYPT.matcher(encodedPassword.value()).matches()
+                && passwordEncoder.matches(rawPassword, encodedPassword.value());
     }
 }

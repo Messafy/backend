@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.notes.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.notes.application.dto.CreatePrivateNoteCommand;
 import com.luispiquinrey.backend.notes.application.port.NoteIdGenerator;
@@ -35,6 +36,9 @@ class CreatePrivateNoteServiceTest {
 
     @Mock
     private NoteIdGenerator idGenerator;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private CreatePrivateNoteService service;

@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class OpenApiConfig {
     public static final String BEARER_AUTH_SCHEME = "bearerAuth";
 
     @Bean
-    public OpenAPI messafyOpenAPI() {
+    public OpenAPI messafyOpenAPI(@Value("${app.public-base-url}") String publicBaseUrl) {
         return new OpenAPI()
                 .info(new Info()
                         .title("Messafy API")
@@ -32,8 +33,8 @@ public class OpenApiConfig {
                                 .name("Private use")))
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8080")
-                                .description("Local development server")))
+                                .url(publicBaseUrl)
+                                .description("Configured API server")))
                 .components(new Components()
                         .addSecuritySchemes(BEARER_AUTH_SCHEME, new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)

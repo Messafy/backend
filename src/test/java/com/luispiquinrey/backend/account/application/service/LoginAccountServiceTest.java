@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.account.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.account.application.dto.LoginAccountCommand;
 import com.luispiquinrey.backend.account.application.port.PasswordHasher;
@@ -44,6 +45,9 @@ class LoginAccountServiceTest {
 
     @Mock
     private AccountRepository repository;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private LoginAccountService service;

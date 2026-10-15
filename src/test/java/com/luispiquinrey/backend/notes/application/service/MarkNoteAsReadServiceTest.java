@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.notes.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.notes.domain.exception.NoteAccessDeniedException;
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
@@ -29,6 +30,9 @@ class MarkNoteAsReadServiceTest {
 
     @Mock
     private NoteRepository repository;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private MarkNoteAsReadService service;

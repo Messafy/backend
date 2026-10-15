@@ -49,8 +49,8 @@ class SharedWithTest {
 
     @Test
     @Tag("sharedWith")
-    void shouldThrowWhenStringIsInvalidObjectId() {
-        assertThrows(IllegalArgumentException.class, () -> new SharedWith("not-a-valid-id"));
+    void shouldAcceptOpaqueAccountId() {
+        assertEquals(new UserId("recipient"), new SharedWith("recipient").ownerId());
     }
 
     @Test

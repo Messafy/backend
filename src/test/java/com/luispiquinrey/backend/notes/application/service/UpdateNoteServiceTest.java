@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.notes.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.notes.application.dto.UpdateNoteCommand;
 import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
@@ -28,6 +29,9 @@ class UpdateNoteServiceTest {
 
     @Mock
     private NoteRepository repository;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private UpdateNoteService service;

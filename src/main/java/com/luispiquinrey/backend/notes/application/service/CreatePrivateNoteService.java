@@ -7,24 +7,24 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
 import java.util.List;
 
-@Service
+@LogExecution
 public class CreatePrivateNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(CreatePrivateNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
     private final NoteIdGenerator idGenerator;
     private final NoteFactory noteFactory = new NoteFactory();
 
-    public CreatePrivateNoteService(NoteRepository repository, NoteIdGenerator idGenerator) {
+    public CreatePrivateNoteService(NoteRepository repository, NoteIdGenerator idGenerator, Logger log) {
         this.repository = repository;
         this.idGenerator = idGenerator;
+        this.log = log;
     }
 
     public Note create(CreatePrivateNoteCommand command, String authenticatedAccountId) {

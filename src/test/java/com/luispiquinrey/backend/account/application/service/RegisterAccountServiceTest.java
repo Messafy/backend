@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.account.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.account.api.AccountRegistered;
 import com.luispiquinrey.backend.account.application.dto.AccountView;
@@ -54,6 +55,9 @@ class RegisterAccountServiceTest {
 
     @Mock
     private PublicCodeGenerator publicCodeGenerator;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private RegisterAccountService service;

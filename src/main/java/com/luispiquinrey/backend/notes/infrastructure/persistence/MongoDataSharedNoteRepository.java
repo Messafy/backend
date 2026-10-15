@@ -8,8 +8,6 @@ import java.util.List;
 
 public interface MongoDataSharedNoteRepository extends MongoRepository<SharedNoteDocument, ObjectId> {
 
-    List<SharedNoteDocument> findAllByStatusAndSharedWith(String status, String sharedWith);
-
     List<SharedNoteDocument> findAllByStatusInAndSharedWith(List<String> statuses, String sharedWith);
 
     @Query("{ '_class': 'shared', 'ownerId': ?0, 'status': { $in: ?1 } }")
@@ -18,7 +16,7 @@ public interface MongoDataSharedNoteRepository extends MongoRepository<SharedNot
     @Query("{ '_class': 'shared', 'ownerId': ?0, 'status': ?1 }")
     List<SharedNoteDocument> findAllByOwnerIdAndStatus(String ownerId, String status);
 
-    List<SharedNoteDocument> findAllByStatusAndOwnerIdAndSharedWith(
-            String status, String ownerId, String sharedWith
+    List<SharedNoteDocument> findAllByStatusInAndOwnerIdAndSharedWith(
+            List<String> statuses, String ownerId, String sharedWith
     );
 }

@@ -36,31 +36,32 @@ class UserIdTest {
                 IllegalArgumentException.class,
                 () -> new UserId("")
         );
-        assertTrue(ex.getMessage().contains("id cannot be empty"));
+        assertTrue(ex.getMessage().contains("blank"));
     }
 
     @Test
     @Tag("userId")
-    void shouldThrowWhenIdIsTooShort() {
-        assertThrows(IllegalArgumentException.class, () -> new UserId("507f1f77bcf86cd79943901"));
+    void shouldAcceptShortOpaqueId() {
+        assertEquals("user-1", new UserId("user-1").id());
     }
 
     @Test
     @Tag("userId")
-    void shouldThrowWhenIdIsTooLong() {
-        assertThrows(IllegalArgumentException.class, () -> new UserId("507f1f77bcf86cd7994390123"));
+    void shouldAcceptUuid() {
+        String uuid = "e8315d38-3156-4d93-b4d2-04fe36305ac4";
+        assertEquals(uuid, new UserId(uuid).id());
     }
 
     @Test
     @Tag("userId")
-    void shouldThrowWhenIdContainsNonHexCharacters() {
-        assertThrows(IllegalArgumentException.class, () -> new UserId("507f1f77bcf86cd79943901z"));
+    void shouldRejectWhitespaceOnly() {
+        assertThrows(IllegalArgumentException.class, () -> new UserId(" \t"));
     }
 
     @Test
     @Tag("userId")
-    void shouldThrowWhenIdIsPlainText() {
-        assertThrows(IllegalArgumentException.class, () -> new UserId("not-a-valid-id"));
+    void shouldAcceptOpaqueId() {
+        assertEquals("external-account", new UserId("external-account").id());
     }
 
     @Test

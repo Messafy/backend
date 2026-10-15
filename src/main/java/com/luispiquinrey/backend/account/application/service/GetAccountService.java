@@ -8,23 +8,23 @@ import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
 import java.util.Optional;
 
-@Service
+@LogExecution
 public class GetAccountService implements AccountLookup {
 
-    private static final Logger log = LoggerFactory.getLogger(GetAccountService.class);
+    private final Logger log;
 
     private final AccountRepository accountRepository;
     private final PasswordHasher passwordHasher;
 
-    public GetAccountService(AccountRepository accountRepository, PasswordHasher passwordHasher) {
+    public GetAccountService(AccountRepository accountRepository, PasswordHasher passwordHasher, Logger log) {
         this.accountRepository = accountRepository;
         this.passwordHasher = passwordHasher;
+        this.log = log;
     }
 
     public AccountView getMyAccount(UserId id) {

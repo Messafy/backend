@@ -13,14 +13,13 @@ import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.PrivateNote;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
-@Service
+@LogExecution
 public class ShareNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(ShareNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
     private final AccountLookup accountLookup;
@@ -30,11 +29,13 @@ public class ShareNoteService {
     public ShareNoteService(
             NoteRepository repository,
             AccountLookup accountLookup,
-            NoteRealtimeNotifier realtimeNotifier
+            NoteRealtimeNotifier realtimeNotifier,
+            Logger log
     ) {
         this.repository = repository;
         this.accountLookup = accountLookup;
         this.realtimeNotifier = realtimeNotifier;
+        this.log = log;
     }
 
     public Note share(String id, ShareNoteCommand command, String authenticatedAccountId) {
@@ -84,7 +85,6 @@ public class ShareNoteService {
                 privateNote.pinned()
         );
 
-        repository.delete(privateNote);
         repository.save(sharedNote);
         log.debug("Shared note {} with account {}", sharedNote.id().id(), recipientId.id());
         realtimeNotifier.notifySharedNote(sharedNote, recipientId.id());

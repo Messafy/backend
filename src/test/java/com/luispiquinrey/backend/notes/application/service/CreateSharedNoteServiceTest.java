@@ -1,4 +1,5 @@
 package com.luispiquinrey.backend.notes.application.service;
+import com.luispiquinrey.backend.share.logging.Logger;
 
 import com.luispiquinrey.backend.account.api.AccountLookup;
 import com.luispiquinrey.backend.notes.application.dto.CreateSharedNoteCommand;
@@ -43,6 +44,9 @@ class CreateSharedNoteServiceTest {
 
     @Mock
     private NoteRealtimeNotifier realtimeNotifier;
+
+    @Mock
+    private Logger log;
 
     @InjectMocks
     private CreateSharedNoteService service;

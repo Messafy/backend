@@ -104,6 +104,7 @@ public abstract class Note {
     }
 
     public void rename(String title) {
+        ensureEditable();
         this.title = new Title(title);
     }
 
@@ -113,7 +114,18 @@ public abstract class Note {
 
     public abstract boolean isOwnedBy(String ownerId);
 
+    public boolean canAccess(String accountId) {
+        return accountId != null && isOwnedBy(accountId);
+    }
+
+    protected void ensureEditable() {
+        if (status.isFinal()) {
+            throw new NoteConflictException("deleted notes cannot be edited");
+        }
+    }
+
     public void changeContent(String content) {
+        ensureEditable();
         this.content = new Content(content);
     }
 
@@ -171,6 +183,7 @@ public abstract class Note {
     }
 
     public void replaceTags(List<Tag> tags) {
+        ensureEditable();
         this.tags = copyTags(tags);
     }
 
@@ -179,6 +192,9 @@ public abstract class Note {
     }
 
     public void setPinned(boolean pinned) {
+        if (status.isFinal()) {
+            throw new NoteConflictException("deleted notes cannot be pinned");
+        }
         this.pinned = pinned;
     }
 

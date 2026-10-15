@@ -38,7 +38,7 @@ class GetNoteControllerTest {
                 "507f1f77bcf86cd799439012"
         );
         GetNoteService service = mock(GetNoteService.class);
-        when(service.findById("507f1f77bcf86cd799439011")).thenReturn(Optional.of(note));
+        when(service.findById("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012")).thenReturn(Optional.of(note));
 
         MockMvc mockMvc = mockMvc(service, "507f1f77bcf86cd799439012");
 
@@ -54,7 +54,7 @@ class GetNoteControllerTest {
     @Tag("getNoteController")
     void shouldReturnNotFoundWhenMissing() throws Exception {
         GetNoteService service = mock(GetNoteService.class);
-        when(service.findById("507f1f77bcf86cd799439011")).thenReturn(Optional.empty());
+        when(service.findById("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012")).thenReturn(Optional.empty());
 
         MockMvc mockMvc = mockMvc(service, "507f1f77bcf86cd799439012");
 
@@ -89,7 +89,7 @@ class GetNoteControllerTest {
                 "507f1f77bcf86cd799439012"
         );
         GetNoteService service = mock(GetNoteService.class);
-        when(service.findByStatus(NoteStatus.NEW)).thenReturn(List.of(note));
+        when(service.findByStatus(NoteStatus.NEW, "507f1f77bcf86cd799439012")).thenReturn(List.of(note));
 
         MockMvc mockMvc = mockMvc(service, "507f1f77bcf86cd799439012");
 

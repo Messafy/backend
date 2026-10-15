@@ -1,32 +1,27 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
 import com.luispiquinrey.backend.account.domain.model.Account;
-import com.luispiquinrey.backend.account.infrastructure.persistence.AccountMapper;
-import com.luispiquinrey.backend.account.infrastructure.persistence.MongoDataAccountRepository;
+import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Service;
 
 public class AccountUserDetailsService implements UserDetailsService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountUserDetailsService.class);
 
-    private final MongoDataAccountRepository repository;
-    private final AccountMapper mapper;
+    private final AccountRepository repository;
 
-    public AccountUserDetailsService(MongoDataAccountRepository repository, AccountMapper mapper) {
+    public AccountUserDetailsService(AccountRepository repository) {
         this.repository = repository;
-        this.mapper = mapper;
     }
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         log.debug("Loading user details for {}", email);
         Account account = repository.findByEmail(email)
-                .map(mapper::toDomain)
                 .orElseThrow(() -> {
                     log.warn("User details lookup failed because account {} was not found", email);
                     return new UsernameNotFoundException(email);

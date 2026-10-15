@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
@@ -27,6 +28,12 @@ public class SecurityConfig {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_USER = "USER";
 
+    private final String frontendUrl;
+
+    public SecurityConfig(@Value("${app.frontend-url}") String frontendUrl) {
+        this.frontendUrl = frontendUrl;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -48,7 +55,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            RateLimiterFilter rateLimiterFilter
     ) throws Exception {
 
         return http
@@ -97,6 +105,7 @@ public class SecurityConfig {
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
+                .addFilterBefore(rateLimiterFilter, JwtAuthenticationFilter.class)
                 .build();
     }
 
@@ -104,7 +113,7 @@ public class SecurityConfig {
         return request -> {
             CorsConfiguration corsConfiguration = new CorsConfiguration();
             corsConfiguration.setAllowedOrigins(
-                    List.of("http://localhost:5173")
+                    List.of(frontendUrl)
             );
             corsConfiguration.setAllowedMethods(
                     List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS")

@@ -3,9 +3,7 @@ package com.luispiquinrey.backend.notes.infrastructure.persistence;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
-import com.luispiquinrey.backend.notes.domain.model.Tag;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import com.luispiquinrey.backend.share.time.Date;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,19 +49,11 @@ public class NoteRepositoryAdapter implements NoteRepository {
     @Override
     public void save(Note note) {
         log.debug("Persisting note {} in MongoDB", note.id().id());
-        baseRepository.findById(mapper.toObjectId(note.id().id()))
-                .ifPresentOrElse(
-                        document -> updateExistingDocument(document, note),
-                        () -> baseRepository.save(mapper.toDocument(note))
-                );
+        NoteDocument document = mapper.toDocument(note);
+        baseRepository.findById(document.getId())
+                .ifPresent(existing -> document.setVersion(existing.getVersion()));
+        baseRepository.save(document);
         log.debug("MongoDB persisted note {}", note.id().id());
-    }
-
-    @Override
-    public void delete(Note note) {
-        log.debug("Deleting note {} from MongoDB", note.id().id());
-        baseRepository.deleteById(mapper.toObjectId(note.id().id()));
-        log.debug("MongoDB deleted note {}", note.id().id());
     }
 
     @Override
@@ -80,7 +70,7 @@ public class NoteRepositoryAdapter implements NoteRepository {
     @Override
     public List<Note> findActiveByOwner(String ownerId) {
         log.debug("Querying MongoDB for active notes owned by or shared with {}", ownerId);
-        List<String> visibleStatuses = List.of(NoteStatus.NEW.name(), NoteStatus.READ.name());
+        List<String> visibleStatuses = visibleStatuses();
         List<NoteDocument> documents = new ArrayList<>();
         documents.addAll(privateRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
         documents.addAll(sharedRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
@@ -93,7 +83,7 @@ public class NoteRepositoryAdapter implements NoteRepository {
     @Override
     public List<Note> findActiveBySharedWith(String sharedWith) {
         log.debug("Querying MongoDB for active notes shared with {}", sharedWith);
-        List<Note> notes = sharedRepository.findAllByStatusAndSharedWith(NoteStatus.NEW.name(), sharedWith)
+        List<Note> notes = sharedRepository.findAllByStatusInAndSharedWith(visibleStatuses(), sharedWith)
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
@@ -104,8 +94,8 @@ public class NoteRepositoryAdapter implements NoteRepository {
     @Override
     public List<Note> findActiveByOwnerAndSharedWith(String ownerId, String sharedWith) {
         log.debug("Querying MongoDB for active notes owned by {} and shared with {}", ownerId, sharedWith);
-        List<Note> notes = sharedRepository.findAllByStatusAndOwnerIdAndSharedWith(
-                NoteStatus.NEW.name(),
+        List<Note> notes = sharedRepository.findAllByStatusInAndOwnerIdAndSharedWith(
+                visibleStatuses(),
                 ownerId,
                 sharedWith
         ).stream().map(mapper::toDomain).toList();
@@ -131,19 +121,7 @@ public class NoteRepositoryAdapter implements NoteRepository {
         return documents.stream().map(mapper::toDomain).toList();
     }
 
-    private void updateExistingDocument(NoteDocument document, Note note) {
-        document.setTitle(note.title().title());
-        document.setContent(note.content().content());
-        document.setStatus(note.status().name());
-        document.setReadAt(toIsoString(note.readAt()));
-        document.setHiddenAt(toIsoString(note.hiddenAt()));
-        document.setReportedAt(toIsoString(note.reportedAt()));
-        document.setTags(note.tags().stream().map(Tag::tag).toList());
-        document.setPinned(note.pinned());
-        baseRepository.save(document);
-    }
-
-    private String toIsoString(Date date) {
-        return date == null ? null : date.value().toString();
+    private List<String> visibleStatuses() {
+        return NoteStatus.visibleStatuses().stream().map(Enum::name).toList();
     }
 }

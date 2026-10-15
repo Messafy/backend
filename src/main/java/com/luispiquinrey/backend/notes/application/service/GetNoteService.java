@@ -4,55 +4,61 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import com.luispiquinrey.backend.share.identity.UserId;
+import com.luispiquinrey.backend.share.logging.Logger;
+import com.luispiquinrey.backend.share.logging.LogExecution;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
+@LogExecution
 public class GetNoteService {
 
-    private static final Logger log = LoggerFactory.getLogger(GetNoteService.class);
+    private final Logger log;
 
     private final NoteRepository repository;
 
-    public GetNoteService(NoteRepository repository) {
+    public GetNoteService(NoteRepository repository, Logger log) {
         this.repository = repository;
+        this.log = log;
     }
 
-    public Optional<Note> findById(String id) {
+    public Optional<Note> findById(String id, String authenticatedAccountId) {
+        new UserId(authenticatedAccountId);
         log.debug("Loading note {}", id);
-        return repository.findById(new NoteId(id));
+        return repository.findById(new NoteId(id))
+                .filter(note -> note.canAccess(authenticatedAccountId));
     }
 
-    public List<Note> findByStatus(NoteStatus status) {
+    public List<Note> findByStatus(NoteStatus status, String authenticatedAccountId) {
+        new UserId(authenticatedAccountId);
         log.debug("Loading notes with status {}", status);
-        List<Note> notes = repository.findByStatus(status.name());
-        return notes;
+        return repository.findByStatus(status.name()).stream()
+                .filter(note -> note.canAccess(authenticatedAccountId))
+                .toList();
     }
 
-    public List<Note> findActiveByOwner(String ownerId) {
-        log.debug("Loading active notes for owner {}", ownerId);
-        List<Note> notes = repository.findActiveByOwner(ownerId);
-        return notes;
+    public List<Note> findActiveByOwner(String authenticatedAccountId) {
+        new UserId(authenticatedAccountId);
+        log.debug("Loading active notes for account {}", authenticatedAccountId);
+        return repository.findActiveByOwner(authenticatedAccountId);
     }
 
-    public List<Note> findActiveBySharedWith(String sharedWith) {
-        log.debug("Loading active notes shared with {}", sharedWith);
-        List<Note> notes = repository.findActiveBySharedWith(sharedWith);
-        return notes;
+    public List<Note> findActiveBySharedWith(String authenticatedAccountId) {
+        new UserId(authenticatedAccountId);
+        log.debug("Loading active notes shared with {}", authenticatedAccountId);
+        return repository.findActiveBySharedWith(authenticatedAccountId);
     }
 
-    public List<Note> findActiveByOwnerAndSharedWith(String ownerId, String sharedWith) {
-        log.debug("Loading active notes for owner {} shared with {}", ownerId, sharedWith);
-        List<Note> notes = repository.findActiveByOwnerAndSharedWith(ownerId, sharedWith);
-        return notes;
+    public List<Note> findActiveByOwnerAndSharedWith(String authenticatedAccountId, String sharedWith) {
+        new UserId(authenticatedAccountId);
+        log.debug("Loading active notes for owner {} shared with {}", authenticatedAccountId, sharedWith);
+        return repository.findActiveByOwnerAndSharedWith(authenticatedAccountId, sharedWith);
     }
 
-    public List<Note> findDeletedByOwner(String ownerId) {
-        log.debug("Loading deleted notes for owner {}", ownerId);
-        return repository.findDeletedByOwner(ownerId);
+    public List<Note> findDeletedByOwner(String authenticatedAccountId) {
+        new UserId(authenticatedAccountId);
+        log.debug("Loading deleted notes for owner {}", authenticatedAccountId);
+        return repository.findDeletedByOwner(authenticatedAccountId);
     }
 }

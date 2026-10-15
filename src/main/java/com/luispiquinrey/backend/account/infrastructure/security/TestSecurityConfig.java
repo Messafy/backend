@@ -31,6 +31,9 @@ public class TestSecurityConfig {
     @Value(value = "${security.user.password}")
     private String password;
 
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     @Bean
     UserDetailsService userDetailsService() {
 
@@ -76,13 +79,11 @@ public class TestSecurityConfig {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
-    // Mirrors the CORS policy of the production SecurityConfig so slice tests
-    // prove the same contract (stateless API: CSRF disabled, see csrf() above).
     private CorsConfigurationSource corsConfigurationSource() {
         return request -> {
             CorsConfiguration corsConfiguration = new CorsConfiguration();
             corsConfiguration.setAllowedOrigins(
-                    List.of("http://localhost:5173")
+                    List.of(frontendUrl)
             );
             corsConfiguration.setAllowedMethods(
                     List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS")

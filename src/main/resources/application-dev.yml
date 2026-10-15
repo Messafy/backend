@@ -1,24 +1,14 @@
 spring:
   config:
+    import: optional:file:./.env[.properties]
     activate:
       on-profile: dev
-  data:
-    mongodb:
-      auto-index-creation: true
   mongodb:
     uri: ${MONGO_URI}
-    database: privatenotes
   mail:
     host: smtp.gmail.com
-    port: 465
     username: ${EMAIL_USERNAME}
     password: ${EMAIL_PASSWORD}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: true
   output:
     ansi:
       enabled: ALWAYS
@@ -26,8 +16,9 @@ logging:
   level:
     root: INFO
     com.luispiquinrey.backend: DEBUG
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
-    org.springframework.web: DEBUG
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
 management:
   endpoints:
     web:

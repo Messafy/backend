@@ -33,8 +33,8 @@ class LockerPasswordTest {
     @Test
     @Timeout(1)
     @Tag("lockerPassword")
-    void shouldRejectNonBcryptEncodedLockerPassword() {
-        Assertions.assertThrows(IllegalArgumentException.class, () -> new LockerPassword("locker-password"));
+    void shouldAcceptAnotherHashAlgorithm() {
+        Assertions.assertDoesNotThrow(() -> new LockerPassword("$argon2id$v=19$m=65536,t=3,p=1$salt$hash"));
     }
 
     @Test

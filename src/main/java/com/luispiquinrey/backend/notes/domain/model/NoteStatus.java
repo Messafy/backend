@@ -2,6 +2,7 @@ package com.luispiquinrey.backend.notes.domain.model;
 
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.List;
 
 public enum NoteStatus {
     NEW,
@@ -15,6 +16,10 @@ public enum NoteStatus {
 
     public boolean isVisible() {
         return VISIBLE_STATUSES.contains(this);
+    }
+
+    public static List<NoteStatus> visibleStatuses() {
+        return List.copyOf(VISIBLE_STATUSES);
     }
 
     public boolean isFinal() {
