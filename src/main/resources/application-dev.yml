@@ -38,7 +38,7 @@ management:
       enabled: true
   opentelemetry:
     resource-attributes:
-      service.name: ghost-notes-backend
+      service.name: messafy-backend
       service.namespace: messafy
       service.version: ${OTEL_SERVICE_VERSION:1.0.0}
       deployment.environment.name: development

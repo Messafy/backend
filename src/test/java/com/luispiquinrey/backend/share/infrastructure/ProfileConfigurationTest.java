@@ -82,6 +82,17 @@ class ProfileConfigurationTest {
         assertFalse(new ClassPathResource(".env").exists());
     }
 
+    @Test
+    @Timeout(1)
+    @Tag("profileConfiguration")
+    void telemetryUsesMessafyServiceIdentity() throws IOException {
+        for (String profile : new String[]{"dev", "prod"}) {
+            var env = profile(profile);
+            assertEquals("messafy-backend", env.getProperty("management.opentelemetry.resource-attributes.service.name"));
+            assertEquals("messafy", env.getProperty("management.opentelemetry.resource-attributes.service.namespace"));
+        }
+    }
+
     private MockEnvironment profile(String profile) throws IOException {
         var env = new MockEnvironment();
         var loader = new YamlPropertySourceLoader();
