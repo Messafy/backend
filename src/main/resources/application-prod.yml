@@ -30,6 +30,11 @@ management:
         include: health
   endpoint:
     health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,mongo
       show-components: never
       show-details: never
   tracing:

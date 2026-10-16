@@ -7,10 +7,16 @@ import com.luispiquinrey.backend.account.presentation.advice.AccountExceptionHan
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,6 +25,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class LoginAccountControllerTest {
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void shouldNotLogUntrustedEmail(CapturedOutput output) {
+        LoginAccountService service = mock(LoginAccountService.class);
+        LoginAccountCommand command = new LoginAccountCommand("user@example.com\r\nFORGED_LOGIN", "password");
+        when(service.login(command)).thenReturn("opaque-login-token");
+
+        var response = new LoginAccountController(service).login(command);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(service).login(command);
+        assertFalse(output.getAll().contains("FORGED_LOGIN"));
+        assertFalse(output.getAll().contains("user@example.com"));
+    }
 
     @Test
     @Timeout(1)

@@ -75,10 +75,10 @@ public class MarkNoteAsReadController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
         String id = request.id();
-        log.info("Received request to mark note {} as read", id);
+        log.info("Received request to mark note as read");
         NoteMarkAsReadResponse response = NoteMarkAsReadResponse.from(
                 service.markAsRead(id, authenticatedUser.accountId()));
-        log.info("Marked note {} as read at {}", id, response.readAt());
+        log.info("Marked note as read");
         return ResponseEntity.ok(response);
     }
 }

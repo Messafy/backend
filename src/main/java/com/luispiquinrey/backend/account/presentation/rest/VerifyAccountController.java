@@ -52,7 +52,7 @@ public class VerifyAccountController {
             log.info("Account verification succeeded");
             return new RedirectView(frontendUrl + "/login?verification=success", false);
         } catch (RuntimeException e) {
-            log.warn("Account verification failed: {}", e.getMessage());
+            log.warn("Account verification failed");
             return new RedirectView(frontendUrl + "/login?verification=failed", false);
         }
     }

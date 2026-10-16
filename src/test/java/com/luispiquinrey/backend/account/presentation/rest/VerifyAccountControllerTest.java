@@ -4,9 +4,14 @@ import com.luispiquinrey.backend.account.application.service.VerifyAccountServic
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -18,6 +23,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class VerifyAccountControllerTest {
 
     private static final String FRONTEND_URL = "http://localhost:5173";
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void shouldNotLogUntrustedExceptionMessage(CapturedOutput output) {
+        VerifyAccountService service = mock(VerifyAccountService.class);
+        doThrow(new IllegalArgumentException("invalid token\r\nFORGED_VERIFICATION"))
+                .when(service).verifyByToken("invalid-token");
+
+        var response = new VerifyAccountController(service, FRONTEND_URL).verify("invalid-token");
+
+        assertEquals(FRONTEND_URL + "/login?verification=failed", response.getUrl());
+        assertFalse(output.getAll().contains("FORGED_VERIFICATION"));
+        assertFalse(output.getAll().contains("invalid token"));
+    }
 
     @Test
     @Timeout(3)

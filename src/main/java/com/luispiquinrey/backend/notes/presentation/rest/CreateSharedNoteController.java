@@ -77,10 +77,10 @@ public class CreateSharedNoteController {
             @Valid @org.springframework.web.bind.annotation.RequestBody SharedNoteCreationRequest request,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        log.info("Received request to create a shared note for recipient with public code {}", request.recipientPublicCode());
+        log.info("Received request to create a shared note");
         Note note = createSharedNoteService.create(request.toCommand(), authenticatedUser.accountId());
         URI location = URI.create("/v1/notes/" + note.id().id());
-        log.info("Created shared note {} and returning location {}", note.id().id(), location);
+        log.info("Created shared note and returning location");
 
         return ResponseEntity.created(location)
                 .body(NoteCreationResponse.from(note));

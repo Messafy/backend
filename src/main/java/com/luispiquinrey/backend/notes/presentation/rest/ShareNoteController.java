@@ -92,9 +92,9 @@ public class ShareNoteController {
             @Valid @org.springframework.web.bind.annotation.RequestBody ShareNoteRequest request,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        log.info("Received request to share note {} with recipient {}", id, request.recipientPublicCode());
+        log.info("Received request to share note");
         Note note = service.share(id, request.toCommand(), authenticatedUser.accountId());
-        log.info("Shared note {} with recipient {}", note.id().id(), request.recipientPublicCode());
+        log.info("Shared note");
         return ResponseEntity.ok(NoteGetResponse.from(note));
     }
 }

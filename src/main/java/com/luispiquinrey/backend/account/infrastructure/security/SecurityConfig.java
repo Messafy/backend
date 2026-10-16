@@ -68,6 +68,9 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/actuator/health/readiness")
+                        .permitAll()
+
                         .requestMatchers("/v1/auth/**")
                         .permitAll()
 

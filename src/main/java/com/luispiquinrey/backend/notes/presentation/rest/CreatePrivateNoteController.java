@@ -78,7 +78,7 @@ public class CreatePrivateNoteController {
         log.info("Received request to create a private note");
         Note note = createPrivateNoteService.create(request.toCommand(), authenticatedUser.accountId());
         URI location = URI.create("/v1/notes/" + note.id().id());
-        log.info("Created private note {} and returning location {}", note.id().id(), location);
+        log.info("Created private note and returning location");
 
         return ResponseEntity.created(location)
                 .body(NoteCreationResponse.from(note));

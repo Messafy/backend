@@ -67,9 +67,9 @@ public class LoginAccountController {
     }
 
     public ResponseEntity<LoginAccountResponse> login(LoginAccountCommand command) {
-        log.info("Received login attempt for {}", command.email());
+        log.info("Received login attempt");
         String token = loginAccountService.login(command);
-        log.info("Login successful for {}", command.email());
+        log.info("Login successful");
         return ResponseEntity.ok(new LoginAccountResponse(token));
     }
 }

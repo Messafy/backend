@@ -90,11 +90,11 @@ public class UpdateNoteController {
             @Valid @org.springframework.web.bind.annotation.RequestBody NoteUpdateRequest request,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        log.info("Received request to update note {}", id);
+        log.info("Received request to update note");
         NoteUpdateResponse response = NoteUpdateResponse.from(
                 service.update(id, request.toCommand(), authenticatedUser.accountId())
         );
-        log.info("Updated note {}", id);
+        log.info("Updated note");
         return ResponseEntity.ok(response);
     }
 }

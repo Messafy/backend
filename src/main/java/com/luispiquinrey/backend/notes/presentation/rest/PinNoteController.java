@@ -87,9 +87,9 @@ public class PinNoteController {
             @org.springframework.web.bind.annotation.RequestBody NotePinRequest request,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        log.info("Received request to set pinned={} on note {}", request.pinned(), id);
+        log.info("Received request to update note pinned state");
         NotePinResponse response = NotePinResponse.from(service.setPinned(id, request.toCommand(), authenticatedUser.accountId()));
-        log.info("Set pinned={} on note {}", request.pinned(), id);
+        log.info("Updated note pinned state");
         return response;
     }
 }

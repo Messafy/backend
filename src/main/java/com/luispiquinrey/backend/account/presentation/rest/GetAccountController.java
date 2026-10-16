@@ -63,7 +63,7 @@ public class GetAccountController {
     public ResponseEntity<AccountGetResponse> me(@AuthenticationPrincipal AuthenticatedUser principal) {
         log.info("Received request to get current account");
         AccountView accountView = service.getMyAccount(new UserId(principal.accountId()));
-        log.info("Returning current account {}", accountView.id());
+        log.info("Returning current account");
         return ResponseEntity.ok(AccountGetResponse.from(accountView));
     }
 
@@ -101,9 +101,9 @@ public class GetAccountController {
     public ResponseEntity<AccountGetResponse> getById(
             @Parameter(description = "Account id as MongoDB ObjectId string", example = "507f1f77bcf86cd799439011")
             @PathVariable String id) {
-        log.info("Received request to get account {}", id);
+        log.info("Received request to get account by id");
         AccountView accountView = service.findById(id);
-        log.info("Returning account {}", accountView.id());
+        log.info("Returning account requested by id");
         return ResponseEntity.ok(AccountGetResponse.from(accountView));
     }
 }

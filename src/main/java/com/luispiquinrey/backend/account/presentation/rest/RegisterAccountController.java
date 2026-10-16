@@ -74,9 +74,9 @@ public class RegisterAccountController {
     }
 
     public ResponseEntity<RegisterAccountResponse> register(RegisterAccountCommand command) {
-        log.info("Received registration request for {}", command.email());
+        log.info("Received registration request");
         AccountView accountView = registerAccountService.register(command);
-        log.info("Created account {}", accountView.id());
+        log.info("Created account");
         return ResponseEntity.status(HttpStatus.CREATED).body(RegisterAccountResponse.from(accountView));
     }
 }

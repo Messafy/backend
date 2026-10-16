@@ -1,0 +1,122 @@
+name: Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
+
+jobs:
+  deployment:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Name kept to match your existing secrets/vars. If this really is production,
+    # create a "production" environment with required reviewers and move them there.
+    environment: DEV_ENVIRONMENT
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build, test and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          ./mvnw --batch-mode clean verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.organization=messafy
+          -Dsonar.projectKey=Messafy_backend
+          -Dsonar.qualitygate.wait=true
+
+      - name: Build image archive with Jib
+        run: >
+          ./mvnw --batch-mode jib:buildTar
+          -Djib.to.image="messafy/backend:${GITHUB_SHA}"
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/ovh_deploy"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+
+      - name: Validate deployment settings
+        shell: bash
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
+          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
+          VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend' }}
+        run: |
+          # SSH assembles a remote shell command: restrict every remote argument.
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$VPS_PORT" =~ ^[0-9]{1,5}$ ]]
+          [[ "$VPS_DEPLOY_DIR" =~ ^/[a-zA-Z0-9_./-]+$ ]]
+
+      - name: Load image on VPS
+        shell: bash
+        timeout-minutes: 8
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
+          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
+        run: |
+          # Transfer over SSH without publishing to a registry or storing a remote archive.
+          ssh -T -p "$VPS_PORT" -i "$HOME/.ssh/ovh_deploy" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            "$VPS_USER@$VPS_HOST" \
+            sudo -n docker load < target/jib-image.tar
+
+      - name: Replace backend container
+        shell: bash
+        timeout-minutes: 8
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
+          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
+          VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend' }}
+        run: |
+          ssh -T -p "$VPS_PORT" -i "$HOME/.ssh/ovh_deploy" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            "$VPS_USER@$VPS_HOST" \
+            bash -s -- "messafy/backend:${GITHUB_SHA}" "$VPS_DEPLOY_DIR" \
+            < .github/scripts/deploy-vps.sh
+
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f "$HOME/.ssh/ovh_deploy" "$HOME/.ssh/known_hosts"

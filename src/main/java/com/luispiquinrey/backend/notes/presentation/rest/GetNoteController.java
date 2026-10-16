@@ -72,22 +72,14 @@ public class GetNoteController {
             @PathVariable String id,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        String safeId = sanitizeForLog(id);
-        log.info("Received request to get note {}", safeId);
+        log.info("Received request to get note by id");
         Optional<Note> note = service.findById(id, authenticatedUser.accountId());
         if (note.isEmpty()) {
-            log.info("Note {} was not found", safeId);
+            log.info("Requested note was not found");
         }
         return note
                 .map(found -> ResponseEntity.ok(NoteGetResponse.from(found)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
-    private String sanitizeForLog(String value) {
-        return value == null
-                ? "null"
-                : value.replace("\n", "_")
-                .replace("\r", "_");
     }
 
     @Operation(
@@ -178,12 +170,12 @@ public class GetNoteController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
         String ownerId = authenticatedUser.accountId();
-        log.info("Received request to list active notes for owner {}", ownerId);
+        log.info("Received request to list active notes for current owner");
         List<NoteGetResponse> body = service.findActiveByOwner(ownerId)
                 .stream()
                 .map(NoteGetResponse::from)
                 .toList();
-        log.info("Returning {} active notes for owner {}", body.size(), ownerId);
+        log.info("Returning {} active notes for current owner", body.size());
         return ResponseEntity.ok(body);
     }
 
@@ -214,12 +206,12 @@ public class GetNoteController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
         String sharedWith = authenticatedUser.accountId();
-        log.info("Received request to list active notes shared with {}", sharedWith);
+        log.info("Received request to list active notes shared with current account");
         List<NoteGetResponse> body = service.findActiveBySharedWith(sharedWith)
                 .stream()
                 .map(NoteGetResponse::from)
                 .toList();
-        log.info("Returning {} active notes shared with {}", body.size(), sharedWith);
+        log.info("Returning {} active notes shared with current account", body.size());
         return ResponseEntity.ok(body);
     }
 
@@ -250,12 +242,12 @@ public class GetNoteController {
     ) {
         String ownerId = authenticatedUser.accountId();
         String sharedWith = request.sharedWith();
-        log.info("Received request to list active notes owned by {} and shared with {}", ownerId, sharedWith);
+        log.info("Received request to list active notes by owner and recipient");
         List<NoteGetResponse> body = service.findActiveByOwnerAndSharedWith(ownerId, sharedWith)
                 .stream()
                 .map(NoteGetResponse::from)
                 .toList();
-        log.info("Returning {} active notes owned by {} and shared with {}", body.size(), ownerId, sharedWith);
+        log.info("Returning {} active notes by owner and recipient", body.size());
         return ResponseEntity.ok(body);
     }
 

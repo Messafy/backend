@@ -76,8 +76,8 @@ public class DeleteNoteController {
             @Valid @org.springframework.web.bind.annotation.RequestBody NoteDeletionRequest request,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
-        log.info("Received request to delete note {}", request.id());
+        log.info("Received request to delete note");
         deleteNoteService.delete(request.id(), authenticatedUser.accountId());
-        log.info("Deleted note {}", request.id());
+        log.info("Deleted note");
     }
 }
