@@ -93,6 +93,29 @@ class ProfileConfigurationTest {
         }
     }
 
+    @Test
+    @Timeout(1)
+    @Tag("profileConfiguration")
+    void productionTelemetryUsesGrafanaCloudEndpointsAndExternalAuthorization() throws IOException {
+        var env = profile("prod");
+        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/traces",
+                env.getProperty("management.opentelemetry.tracing.export.otlp.endpoint"));
+        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/logs",
+                env.getProperty("management.opentelemetry.logging.export.otlp.endpoint"));
+        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/metrics",
+                env.getProperty("management.otlp.metrics.export.url"));
+        assertThrows(IllegalArgumentException.class,
+                () -> env.getProperty("management.opentelemetry.tracing.export.otlp.headers.Authorization"));
+
+        env.setProperty("GRAFANA_CLOUD_AUTHORIZATION", "Basic test-credential");
+        assertEquals("Basic test-credential",
+                env.getProperty("management.opentelemetry.tracing.export.otlp.headers.Authorization"));
+        assertEquals("Basic test-credential",
+                env.getProperty("management.opentelemetry.logging.export.otlp.headers.Authorization"));
+        assertEquals("Basic test-credential",
+                env.getProperty("management.otlp.metrics.export.headers.Authorization"));
+    }
+
     private MockEnvironment profile(String profile) throws IOException {
         var env = new MockEnvironment();
         var loader = new YamlPropertySourceLoader();

@@ -47,12 +47,18 @@ management:
     tracing:
       export:
         otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://grafana-otel-lgtm:4318/v1/traces}
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/traces}
+          headers:
+            Authorization: ${GRAFANA_CLOUD_AUTHORIZATION}
     logging:
       export:
         otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:http://grafana-otel-lgtm:4318/v1/logs}
+          endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/logs}
+          headers:
+            Authorization: ${GRAFANA_CLOUD_AUTHORIZATION}
   otlp:
     metrics:
       export:
-        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://grafana-otel-lgtm:4318/v1/metrics}
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/metrics}
+        headers:
+          Authorization: ${GRAFANA_CLOUD_AUTHORIZATION}
