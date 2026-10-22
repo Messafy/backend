@@ -8,6 +8,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -85,35 +86,36 @@ class ProfileConfigurationTest {
     @Test
     @Timeout(1)
     @Tag("profileConfiguration")
-    void telemetryUsesMessafyServiceIdentity() throws IOException {
-        for (String profile : new String[]{"dev", "prod"}) {
-            var env = profile(profile);
-            assertEquals("messafy-backend", env.getProperty("management.opentelemetry.resource-attributes.service.name"));
-            assertEquals("messafy", env.getProperty("management.opentelemetry.resource-attributes.service.namespace"));
-        }
+    void developmentTelemetryUsesMessafyServiceIdentity() throws IOException {
+        var env = profile("dev");
+        assertEquals("messafy-backend", env.getProperty("management.opentelemetry.resource-attributes.service.name"));
+        assertEquals("messafy", env.getProperty("management.opentelemetry.resource-attributes.service.namespace"));
     }
 
     @Test
     @Timeout(1)
     @Tag("profileConfiguration")
-    void productionTelemetryUsesGrafanaCloudEndpointsAndExternalAuthorization() throws IOException {
+    void productionTelemetryUsesStandardOpenTelemetryEnvironmentVariables() throws IOException {
         var env = profile("prod");
-        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/traces",
-                env.getProperty("management.opentelemetry.tracing.export.otlp.endpoint"));
-        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/logs",
-                env.getProperty("management.opentelemetry.logging.export.otlp.endpoint"));
-        assertEquals("https://otlp-gateway-prod-us-west-0.grafana.net/otlp/v1/metrics",
-                env.getProperty("management.otlp.metrics.export.url"));
-        assertThrows(IllegalArgumentException.class,
-                () -> env.getProperty("management.opentelemetry.tracing.export.otlp.headers.Authorization"));
+        assertNull(env.getProperty("management.opentelemetry.tracing.export.otlp.endpoint"));
+        assertNull(env.getProperty("management.opentelemetry.logging.export.otlp.endpoint"));
+        assertNull(env.getProperty("management.otlp.metrics.export.url"));
 
-        env.setProperty("GRAFANA_CLOUD_AUTHORIZATION", "Basic test-credential");
-        assertEquals("Basic test-credential",
-                env.getProperty("management.opentelemetry.tracing.export.otlp.headers.Authorization"));
-        assertEquals("Basic test-credential",
-                env.getProperty("management.opentelemetry.logging.export.otlp.headers.Authorization"));
-        assertEquals("Basic test-credential",
-                env.getProperty("management.otlp.metrics.export.headers.Authorization"));
+        var compose = new ClassPathResource("docker-compose.prod.yml")
+                .getContentAsString(StandardCharsets.UTF_8);
+        for (String variable : new String[]{
+                "OTEL_SERVICE_NAME",
+                "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "OTEL_EXPORTER_OTLP_PROTOCOL",
+                "OTEL_RESOURCE_ATTRIBUTES",
+                "OTEL_EXPORTER_OTLP_HEADERS"
+        }) {
+            assertTrue(compose.contains(variable + ":"), variable + " must be passed to the backend container");
+        }
+        assertFalse(compose.contains("GRAFANA_CLOUD_AUTHORIZATION"));
+        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"));
+        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"));
+        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"));
     }
 
     private MockEnvironment profile(String profile) throws IOException {
