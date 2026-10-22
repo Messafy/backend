@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: backend-production
@@ -17,25 +19,32 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Name kept to match your existing secrets/vars. If this really is production,
-    # create a "production" environment with required reviewers and move them there.
     environment: DEV_ENVIRONMENT
+
+    env:
+      VPS_HOST: ${{ vars.VPS_HOST }}
+      VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
+      VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
+      VPS_ENV_FILE: ${{ vars.VPS_ENV_FILE || '/home/ubuntu/messafy/backend/.env.prod' }}
+      VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend/deploy' }}
+
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
 
       - name: Cache SonarQube packages
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
@@ -55,68 +64,85 @@ jobs:
           -Dsonar.projectKey=Messafy_backend
           -Dsonar.qualitygate.wait=true
 
-      - name: Build image archive with Jib
-        run: >
-          ./mvnw --batch-mode jib:buildTar
-          -Djib.to.image="messafy/backend:${GITHUB_SHA}"
+      - name: Set image name
+        run: echo "BACKEND_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Configure SSH
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish commit image with Jib
+        run: >
+          ./mvnw --batch-mode jib:build
+          -Djib.to.image="${BACKEND_IMAGE}"
+
+      - name: Deploy with Docker Compose over SSH
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
         run: |
+          set -euo pipefail
           test -n "$VPS_SSH_PRIVATE_KEY"
           test -n "$VPS_SSH_KNOWN_HOSTS"
-          install -m 700 -d "$HOME/.ssh"
-          umask 077
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/ovh_deploy"
-          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-
-      - name: Validate deployment settings
-        shell: bash
-        env:
-          VPS_HOST: ${{ vars.VPS_HOST }}
-          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
-          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
-          VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend' }}
-        run: |
-          # SSH assembles a remote shell command: restrict every remote argument.
+          test -n "$GHCR_TOKEN"
+          test -n "$VPS_HOST"
           [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
           [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
-          [[ "$VPS_PORT" =~ ^[0-9]{1,5}$ ]]
+          [[ "$GHCR_USERNAME" =~ ^[a-zA-Z0-9-]+$ ]]
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] && ((VPS_PORT >= 1 && VPS_PORT <= 65535))
+          [[ "$VPS_ENV_FILE" =~ ^/[a-zA-Z0-9_./-]+$ ]]
           [[ "$VPS_DEPLOY_DIR" =~ ^/[a-zA-Z0-9_./-]+$ ]]
+          [[ "$BACKEND_IMAGE" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[0-9a-f]{40}$ ]]
 
-      - name: Load image on VPS
-        shell: bash
-        timeout-minutes: 8
-        env:
-          VPS_HOST: ${{ vars.VPS_HOST }}
-          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
-          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
-        run: |
-          # Transfer over SSH without publishing to a registry or storing a remote archive.
-          ssh -T -p "$VPS_PORT" -i "$HOME/.ssh/ovh_deploy" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
-            "$VPS_USER@$VPS_HOST" \
-            sudo -n docker load < target/jib-image.tar
+          install -m 700 -d "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+          ssh-keygen -F "$VPS_HOST" -f "$HOME/.ssh/known_hosts" |
+            awk -v host="$VPS_HOST" -v port="$VPS_PORT" \
+              '!/^#/ && NF >= 3 { $1 = "[" host "]:" port; print }' \
+            > "$HOME/.ssh/known_hosts_port" || true
+          cat "$HOME/.ssh/known_hosts_port" >> "$HOME/.ssh/known_hosts"
 
-      - name: Replace backend container
-        shell: bash
-        timeout-minutes: 8
-        env:
-          VPS_HOST: ${{ vars.VPS_HOST }}
-          VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
-          VPS_USER: ${{ vars.VPS_USER || 'ubuntu' }}
-          VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend' }}
-        run: |
-          ssh -T -p "$VPS_PORT" -i "$HOME/.ssh/ovh_deploy" \
+          ssh_options=(-p "$VPS_PORT" -i "$HOME/.ssh/deploy_key"
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
+          target="$VPS_USER@$VPS_HOST"
+
+          ssh "${ssh_options[@]}" "$target" "mkdir -p $VPS_DEPLOY_DIR"
+          scp -P "$VPS_PORT" -i "$HOME/.ssh/deploy_key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
-            "$VPS_USER@$VPS_HOST" \
-            bash -s -- "messafy/backend:${GITHUB_SHA}" "$VPS_DEPLOY_DIR" \
-            < .github/scripts/deploy-vps.sh
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            src/main/resources/docker-compose.prod.yml \
+            src/main/resources/Caddyfile \
+            src/main/resources/Dockerfile.caddy \
+            "$target:$VPS_DEPLOY_DIR/"
+
+          {
+            printf '%s\n' "$GHCR_TOKEN"
+            cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          test -r "$VPS_ENV_FILE"
+
+          DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf -- "$DOCKER_CONFIG"' EXIT
+          export DOCKER_CONFIG
+
+          printf '%s' "$GHCR_TOKEN" |
+            docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          compose=(docker compose -p messafy-prod --env-file "$VPS_ENV_FILE" -f "$VPS_DEPLOY_DIR/docker-compose.prod.yml")
+          "${compose[@]}" pull backend tunnel
+          "${compose[@]}" up -d --build --remove-orphans
+          REMOTE_SCRIPT
+          } | ssh "${ssh_options[@]}" "$target" \
+            "read -r GHCR_TOKEN; export GHCR_TOKEN; export GHCR_USERNAME='$GHCR_USERNAME' VPS_ENV_FILE='$VPS_ENV_FILE' VPS_DEPLOY_DIR='$VPS_DEPLOY_DIR' BACKEND_IMAGE='$BACKEND_IMAGE'; bash -s"
 
       - name: Remove SSH credentials
         if: always()
-        run: rm -f "$HOME/.ssh/ovh_deploy" "$HOME/.ssh/known_hosts"
+        run: rm -f "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts" "$HOME/.ssh/known_hosts_port"

@@ -35,4 +35,6 @@ build/
 *.key
 *.p12
 secrets/
+/.kamal/secrets
+/.kamal/secrets.*
 /src/main/resources/bruno/

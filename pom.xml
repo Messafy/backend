@@ -310,6 +310,10 @@
                     </to>
                     <container>
                         <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+                        <labels>
+                            <!-- Kamal validates this label before deploying Jib images. -->
+                            <service>messafy-backend</service>
+                        </labels>
                     </container>
                 </configuration>
             </plugin>

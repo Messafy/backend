@@ -1,23 +1,21 @@
 services:
   backend:
-    container_name: messafy-prod-backend
-    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to a versioned image available on the VPS}
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE}
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      MONGO_URI: ${MONGO_URI:?Set MONGO_URI to the MongoDB Cloud connection string}
+      MONGO_URI: ${MONGO_URI:?Set MONGO_URI}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:?Set APP_FRONTEND_URL}
       APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:?Set APP_PUBLIC_BASE_URL}
       EMAIL_USERNAME: ${EMAIL_USERNAME:?Set EMAIL_USERNAME}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?Set EMAIL_PASSWORD}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-messafy-backend}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:?Set the Grafana Cloud OTLP endpoint}
-      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
-      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-service.namespace=messafy,deployment.environment.name=production}
-      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?Set the Grafana Cloud OTLP authorization header}
-    networks:
-      - edge
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?Set OTEL_SERVICE_NAME}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:?Set OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:?Set OTEL_EXPORTER_OTLP_PROTOCOL}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:?Set OTEL_RESOURCE_ATTRIBUTES}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?Set OTEL_EXPORTER_OTLP_HEADERS}
+    networks: [edge]
 
   caddy:
     container_name: messafy-prod-caddy
@@ -27,15 +25,13 @@ services:
       dockerfile: Dockerfile.caddy
     restart: unless-stopped
     command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    environment:
+      BACKEND_UPSTREAM: backend:8080
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - edge
+    networks: [edge]
 
   tunnel:
     container_name: messafy-prod-tunnel
@@ -47,8 +43,7 @@ services:
     depends_on:
       caddy:
         condition: service_started
-    networks:
-      - edge
+    networks: [edge]
 
 networks:
   edge:

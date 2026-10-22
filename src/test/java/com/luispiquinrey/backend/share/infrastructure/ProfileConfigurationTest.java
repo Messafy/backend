@@ -8,7 +8,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,27 +94,15 @@ class ProfileConfigurationTest {
     @Test
     @Timeout(1)
     @Tag("profileConfiguration")
-    void productionTelemetryUsesStandardOpenTelemetryEnvironmentVariables() throws IOException {
+    void productionTelemetryDoesNotOverrideStandardOpenTelemetryConfiguration() throws IOException {
         var env = profile("prod");
         assertNull(env.getProperty("management.opentelemetry.tracing.export.otlp.endpoint"));
         assertNull(env.getProperty("management.opentelemetry.logging.export.otlp.endpoint"));
         assertNull(env.getProperty("management.otlp.metrics.export.url"));
 
-        var compose = new ClassPathResource("docker-compose.prod.yml")
-                .getContentAsString(StandardCharsets.UTF_8);
-        for (String variable : new String[]{
-                "OTEL_SERVICE_NAME",
-                "OTEL_EXPORTER_OTLP_ENDPOINT",
-                "OTEL_EXPORTER_OTLP_PROTOCOL",
-                "OTEL_RESOURCE_ATTRIBUTES",
-                "OTEL_EXPORTER_OTLP_HEADERS"
-        }) {
-            assertTrue(compose.contains(variable + ":"), variable + " must be passed to the backend container");
-        }
-        assertFalse(compose.contains("GRAFANA_CLOUD_AUTHORIZATION"));
-        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"));
-        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"));
-        assertFalse(compose.contains("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"));
+        // Container environment now comes from the VPS .env.prod through Kamal;
+        // Compose manages only Caddy and Tunnel. Keep testing Spring's contract here.
+        assertNull(env.getProperty("management.opentelemetry.resource-attributes.service.name"));
     }
 
     private MockEnvironment profile(String profile) throws IOException {
