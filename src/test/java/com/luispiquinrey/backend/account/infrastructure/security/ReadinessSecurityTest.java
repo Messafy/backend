@@ -42,7 +42,6 @@ class ReadinessSecurityTest {
     static class TestConfiguration {
         @Bean JwtTokenVerifier jwtTokenVerifier() { return mock(JwtTokenVerifier.class); }
         @Bean UserDetailsService userDetailsService() { return mock(UserDetailsService.class); }
-        @Bean RateLimiterFilter rateLimiterFilter() { return new RateLimiterFilter(); }
         @Bean HealthController healthController() { return new HealthController(); }
     }
 

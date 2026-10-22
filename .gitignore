@@ -35,3 +35,4 @@ build/
 *.key
 *.p12
 secrets/
+/src/main/resources/bruno/

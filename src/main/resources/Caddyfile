@@ -1,0 +1,25 @@
+:80 {
+	rate_limit {
+		zone authentication {
+			match {
+				path /v1/auth/*
+			}
+			key {http.request.header.CF-Connecting-IP}
+			events 10
+			window 1m
+			ipv6_prefix 64
+		}
+
+		zone application {
+			match {
+				not path /actuator/health/readiness
+			}
+			key {http.request.header.CF-Connecting-IP}
+			events 300
+			window 1m
+			ipv6_prefix 64
+		}
+	}
+
+	reverse_proxy backend:8080
+}

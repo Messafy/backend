@@ -55,8 +55,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            RateLimiterFilter rateLimiterFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter
     ) throws Exception {
 
         return http
@@ -108,7 +107,6 @@ public class SecurityConfig {
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
-                .addFilterBefore(rateLimiterFilter, JwtAuthenticationFilter.class)
                 .build();
     }
 

@@ -1,12 +1,13 @@
 services:
   mongodb:
+    container_name: messafy-mongodb
     image: mongo:7
     environment:
       MONGO_INITDB_DATABASE: privatenotes
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD}
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -17,36 +18,81 @@ services:
       start_period: 20s
 
   backend:
-    image: messafy/backend:latest
+    container_name: messafy-backend
+    profiles: [backend]
+    image: ${BACKEND_IMAGE:-messafy/backend:dev}
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      MONGO_URI: ${MONGO_URI_DOCKER}
-      JWT_SECRET: ${JWT_SECRET}
-      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
-      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL}
-      EMAIL_USERNAME: ${EMAIL_USERNAME}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      SPRING_PROFILES_ACTIVE: dev
+      MONGO_URI: ${MONGO_URI_DOCKER:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:5173}
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-http://localhost:8080}
+      EMAIL_USERNAME: ${EMAIL_USERNAME:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://grafana-otel-lgtm:4318/v1/traces
       OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://grafana-otel-lgtm:4318/v1/metrics
       OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://grafana-otel-lgtm:4318/v1/logs
-      OTEL_SERVICE_NAME: messafy-backend
-      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-1.0.0}
-      OTEL_RESOURCE_ATTRIBUTES: service.name=messafy-backend,service.namespace=messafy,service.version=${OTEL_SERVICE_VERSION:-1.0.0},deployment.environment.name=production
-      OTEL_ENVIRONMENT: production
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       mongodb:
         condition: service_healthy
       grafana-otel-lgtm:
-        condition: service_healthy
+        condition: service_started
+
+  frontend:
+    container_name: messafy-frontend
+    profiles: [web]
+    image: node:22-bookworm-slim
+    init: true
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - npm ci --no-audit --no-fund && exec npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - type: bind
+        source: ../../../../frontend
+        target: /app
+        bind:
+          create_host_path: false
+      - frontend-node-modules:/app/node_modules
+
+  landing:
+    container_name: messafy-landing
+    profiles: [web]
+    image: node:22-bookworm-slim
+    init: true
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 4321 --background && exec npm run astro -- dev logs --follow
+    environment:
+      PUBLIC_APP_URL: http://localhost:5173
+    ports:
+      - "127.0.0.1:4321:4321"
+    volumes:
+      - type: bind
+        source: ../../../../landing
+        target: /app
+        bind:
+          create_host_path: false
+      - landing-node-modules:/app/node_modules
+      - landing-astro-cache:/app/.astro
 
   grafana-otel-lgtm:
+    container_name: messafy-grafana-otel-lgtm
     image: grafana/otel-lgtm:latest
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "3000:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:3000:3000"
 
 volumes:
   mongo-data:
+  frontend-node-modules:
+  landing-node-modules:
+  landing-astro-cache:

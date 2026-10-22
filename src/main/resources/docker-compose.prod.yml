@@ -1,0 +1,58 @@
+services:
+  backend:
+    container_name: messafy-prod-backend
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to a versioned image available on the VPS}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MONGO_URI: ${MONGO_URI:?Set MONGO_URI to the MongoDB Cloud connection string}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:?Set APP_FRONTEND_URL}
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:?Set APP_PUBLIC_BASE_URL}
+      EMAIL_USERNAME: ${EMAIL_USERNAME:?Set EMAIL_USERNAME}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:?Set EMAIL_PASSWORD}
+      GRAFANA_CLOUD_AUTHORIZATION: ${GRAFANA_CLOUD_AUTHORIZATION:?Set GRAFANA_CLOUD_AUTHORIZATION}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:?Set the Grafana Cloud traces endpoint}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:?Set the Grafana Cloud metrics endpoint}
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:?Set the Grafana Cloud logs endpoint}
+      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-1.0.0}
+    networks:
+      - edge
+
+  caddy:
+    container_name: messafy-prod-caddy
+    image: messafy/caddy-ratelimit:2.10.2-v0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    restart: unless-stopped
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - edge
+
+  tunnel:
+    container_name: messafy-prod-tunnel
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set the Cloudflare Tunnel token}
+    depends_on:
+      caddy:
+        condition: service_started
+    networks:
+      - edge
+
+networks:
+  edge:
+
+volumes:
+  caddy-data:
+  caddy-config:
