@@ -1,10 +1,13 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
-import com.luispiquinrey.backend.account.application.dto.AccountView;
-import com.luispiquinrey.backend.account.application.dto.RegisterAccountCommand;
-import com.luispiquinrey.backend.account.application.service.RegisterAccountService;
-import com.luispiquinrey.backend.account.presentation.dto.RegisterAccountRequest;
-import com.luispiquinrey.backend.account.presentation.dto.RegisterAccountResponse;
+import com.luispiquinrey.backend.account.application.use_cases.RegisterAccountUseCase;
+import com.luispiquinrey.backend.account.application.dto.request.RegisterAccountRequest;
+import com.luispiquinrey.backend.account.presentation.viewmodel.RegisteredAccountViewModel;
+import com.luispiquinrey.backend.account.presentation.presenter.RegisterAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.share.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,16 +15,15 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -30,10 +32,17 @@ public class RegisterAccountController {
 
     private static final Logger log = LoggerFactory.getLogger(RegisterAccountController.class);
 
-    private final RegisterAccountService registerAccountService;
+    private final RegisterAccountUseCase registerAccountUseCase;
+    private final RegisterAccountPresenter presenter;
+    private final HttpResponsePresenter httpResponsePresenter;
 
-    public RegisterAccountController(RegisterAccountService registerAccountService) {
-        this.registerAccountService = registerAccountService;
+    public RegisterAccountController(
+            RegisterAccountUseCase registerAccountUseCase,
+            RegisterAccountPresenter presenter,
+            HttpResponsePresenter httpResponsePresenter) {
+        this.registerAccountUseCase = registerAccountUseCase;
+        this.presenter = presenter;
+        this.httpResponsePresenter = httpResponsePresenter;
     }
 
     @Operation(
@@ -53,30 +62,33 @@ public class RegisterAccountController {
                     description = "Account created",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = RegisterAccountResponse.class))),
+                            schema = @Schema(implementation = RegisteredAccountViewModel.class))),
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid registration data (blank fields, malformed email, weak locker password)",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ProblemDetail.class))),
+                            schema = @Schema(implementation = ErrorViewModel.class))),
             @ApiResponse(
                     responseCode = "409",
                     description = "An account with the same email or public code already exists",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ProblemDetail.class)))})
+                            schema = @Schema(implementation = ErrorViewModel.class)))})
     @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<RegisterAccountResponse> register(
-            @Valid @org.springframework.web.bind.annotation.RequestBody RegisterAccountRequest request) {
-        return register(request.toCommand());
-    }
-
-    public ResponseEntity<RegisterAccountResponse> register(RegisterAccountCommand command) {
+    public ResponseEntity<?> register(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
         log.info("Received registration request");
-        AccountView accountView = registerAccountService.register(command);
-        log.info("Created account");
-        return ResponseEntity.status(HttpStatus.CREATED).body(RegisterAccountResponse.from(accountView));
+        RegisterAccountRequest input;
+        try {
+            input = new RegisterAccountRequest(body.get("email"), body.get("rawPassword"), body.get("rawLockerPassword"));
+        } catch (IllegalArgumentException e) {
+            return httpResponsePresenter.toHttp(
+                    presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))),
+                    view -> ResponseEntity.status(HttpStatus.CREATED).body(view));
+        }
+        return httpResponsePresenter.toHttp(
+                presenter.present(registerAccountUseCase.register(input)),
+                view -> ResponseEntity.status(HttpStatus.CREATED).body(view));
     }
 }

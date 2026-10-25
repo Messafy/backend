@@ -37,6 +37,7 @@ public class AccountMapper {
                 .lockerPassword(new LockerPassword(accountDocument.getEncodedLockerPassword()))
                 .createdAt(toAccountDate(accountDocument.getCreatedAt()))
                 .lastLoginAt(toAccountDate(accountDocument.getLastLoginAt()))
+                .version(accountDocument.getVersion())
                 .build();
     }
 
@@ -44,7 +45,7 @@ public class AccountMapper {
         Objects.requireNonNull(account, "account cannot be null");
         log.debug("Mapping account {} to MongoDB document", account.id().id());
 
-        return new AccountDocument(
+        AccountDocument document = new AccountDocument(
                 toObjectId(account.id().id()),
                 account.email().email(),
                 account.encodedPassword().value(),
@@ -56,6 +57,8 @@ public class AccountMapper {
                 toIsoString(account.createdAt()),
                 toIsoString(account.lastLoginAt())
         );
+        document.setVersion(account.version());
+        return document;
     }
 
     public ObjectId toObjectId(String id) {

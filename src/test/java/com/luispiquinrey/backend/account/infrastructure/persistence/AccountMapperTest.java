@@ -144,4 +144,19 @@ class AccountMapperTest {
                 () -> Assertions.assertThrows(NullPointerException.class, () -> mapper.toObjectId(null))
         );
     }
+
+    @Test
+    @Tag("accountMapper")
+    @Timeout(1)
+    void shouldPreserveSnapshotVersionInBothDirections() {
+        Account account = new Account.AccountBuilder().id(new UserId("507f1f77bcf86cd799439011"))
+                .email(new Email("user@example.test")).encodedPassword(new EncodedPassword(ENCODED_PASSWORD))
+                .publicCode(new PublicCode(PUBLIC_CODE)).lockerPassword(new LockerPassword(ENCODED_LOCKER))
+                .version(7).build();
+
+        AccountDocument document = mapper.toDocument(account);
+
+        Assertions.assertEquals(7, document.getVersion());
+        Assertions.assertEquals(7, mapper.toDomain(document).version());
+    }
 }

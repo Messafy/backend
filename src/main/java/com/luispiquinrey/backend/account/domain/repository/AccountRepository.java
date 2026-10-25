@@ -8,12 +8,8 @@ import java.util.Optional;
 
 @Repository
 public interface AccountRepository {
-
     Optional<Account> findById(UserId id);
-
     Optional<Account> findByEmail(String email);
-
     Optional<Account> findByPublicCode(String publicCode);
-
     void save(Account account);
 }

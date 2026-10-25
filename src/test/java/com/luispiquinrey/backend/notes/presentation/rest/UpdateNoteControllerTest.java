@@ -1,72 +1,73 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
-import com.luispiquinrey.backend.notes.application.dto.UpdateNoteCommand;
-import com.luispiquinrey.backend.notes.application.service.UpdateNoteService;
-import com.luispiquinrey.backend.notes.domain.model.Note;
-import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
-import com.luispiquinrey.backend.notes.presentation.dto.NoteUpdateRequest;
-import com.luispiquinrey.backend.notes.presentation.dto.NoteUpdateResponse;
+import com.luispiquinrey.backend.notes.application.dto.response.UpdatedNoteResponse;
+import com.luispiquinrey.backend.notes.application.port.UpdateNotePort;
+import com.luispiquinrey.backend.notes.presentation.presenter.UpdateNotePresenter;
+import com.luispiquinrey.backend.notes.presentation.viewmodel.UpdateNoteViewModel;
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class UpdateNoteControllerTest {
 
+    private static final AuthenticatedUser USER = () -> "owner";
+
+    private final UpdateNotePort useCase = mock(UpdateNotePort.class);
+    private final UpdateNoteController controller =
+            new UpdateNoteController(useCase, new UpdateNotePresenter(new ErrorPresenter()), new HttpResponsePresenter());
+
     @Test
-    @ExtendWith(OutputCaptureExtension.class)
-    void shouldNotLogUntrustedNoteId(CapturedOutput output) {
-        String id = "note\r\nFORGED_NOTE";
-        AuthenticatedUser authenticatedUser = () -> "owner";
-        NoteUpdateRequest request = new NoteUpdateRequest("Title", "Content");
-        UpdateNoteCommand command = new UpdateNoteCommand(request.title(), request.content(), request.tags());
-        Note note = new NoteFactory().createPrivateNote("note", "Title", "Content", "owner");
-        UpdateNoteService service = mock(UpdateNoteService.class);
-        when(service.update(id, command, "owner")).thenReturn(note);
+    @Timeout(1)
+    @Tag("updateNoteController")
+    void returnsUpdatedNote() {
+        when(useCase.update(any())).thenReturn(Result.success(
+                new UpdatedNoteResponse("note", "New title", "New content")));
 
-        var response = new UpdateNoteController(service).update(id, request, authenticatedUser);
+        var response = controller.update("note", Map.of(
+                "title", "New title", "content", "New content", "tags", List.of("work")), USER);
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(service).update(id, command, "owner");
-        assertFalse(output.getAll().contains("FORGED_NOTE"));
+        assertEquals(200, response.getStatusCode().value());
+        var view = assertInstanceOf(UpdateNoteViewModel.class, response.getBody());
+        assertEquals("New title", view.title());
+        assertEquals("New content", view.content());
     }
 
     @Test
     @Timeout(1)
     @Tag("updateNoteController")
-    void shouldReturnUpdatedNote() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Updated title",
-                "Updated content",
-                "507f1f77bcf86cd799439012"
-        );
-        UpdateNoteService service = mock(UpdateNoteService.class);
-        NoteUpdateRequest request = new NoteUpdateRequest("Updated title", "Updated content");
-        AuthenticatedUser authenticatedUser = () -> "507f1f77bcf86cd799439012";
-        when(service.update(
-                "507f1f77bcf86cd799439011",
-                new UpdateNoteCommand(request.title(), request.content(), request.tags()),
-                authenticatedUser.accountId()
-        )).thenReturn(note);
+    void validatesBodyBeforeCallingUseCase() {
+        var response = controller.update("note", Map.of("title", " ", "content", "Content"), USER);
 
-        ResponseEntity<NoteUpdateResponse> response = new UpdateNoteController(service)
-                .update("507f1f77bcf86cd799439011", request, authenticatedUser);
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        verify(useCase, never()).update(any());
+    }
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("507f1f77bcf86cd799439011", response.getBody().id());
-        assertEquals("Updated title", response.getBody().title());
-        assertEquals("Updated content", response.getBody().content());
+    @Test
+    @Timeout(1)
+    @Tag("updateNoteController")
+    void mapsSharedNoteConflictToConflict() {
+        when(useCase.update(any())).thenReturn(Result.failure(
+                ApplicationError.conflictError("shared notes cannot be edited")));
+
+        var response = controller.update("note", Map.of("title", "Title", "content", "Content"), USER);
+
+        assertEquals(409, response.getStatusCode().value());
     }
 }

@@ -1,6 +1,12 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
-import com.luispiquinrey.backend.account.application.service.VerifyAccountService;
+import com.luispiquinrey.backend.account.application.use_cases.VerifyAccountUseCase;
+import com.luispiquinrey.backend.account.application.dto.request.VerifyAccountRequest;
+import com.luispiquinrey.backend.account.presentation.presenter.VerifyAccountPresenter;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.share.presentation.OperationResult;
+import com.luispiquinrey.backend.account.presentation.viewmodel.VerificationViewModel;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,14 +28,17 @@ public class VerifyAccountController {
 
     private static final Logger log = LoggerFactory.getLogger(VerifyAccountController.class);
 
-    private final VerifyAccountService verifyAccountService;
+    private final VerifyAccountUseCase verifyAccountUseCase;
+    private final VerifyAccountPresenter presenter;
     private final String frontendUrl;
 
     public VerifyAccountController(
-            VerifyAccountService verifyAccountService,
+            VerifyAccountUseCase verifyAccountUseCase,
+            VerifyAccountPresenter presenter,
             @Value("${app.frontend-url}") String frontendUrl
     ) {
-        this.verifyAccountService = verifyAccountService;
+        this.verifyAccountUseCase = verifyAccountUseCase;
+        this.presenter = presenter;
         this.frontendUrl = frontendUrl;
     }
 
@@ -47,13 +56,26 @@ public class VerifyAccountController {
             @Parameter(description = "One-time verification JWT received by email")
             @RequestParam("token") String token) {
         log.info("Received account verification request");
+        VerifyAccountRequest input;
         try {
-            verifyAccountService.verifyByToken(token);
-            log.info("Account verification succeeded");
-            return new RedirectView(frontendUrl + "/login?verification=success", false);
+            input = new VerifyAccountRequest(token);
+        } catch (IllegalArgumentException e) {
+            return redirect(presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))));
+        }
+        try {
+            return redirect(presenter.present(verifyAccountUseCase.verifyByToken(input)));
         } catch (RuntimeException e) {
             log.warn("Account verification failed");
             return new RedirectView(frontendUrl + "/login?verification=failed", false);
         }
+    }
+
+    private RedirectView redirect(OperationResult<VerificationViewModel> outcome) {
+        if (outcome.isFailure() || !outcome.getValue().verified()) {
+            log.warn("Account verification failed");
+            return new RedirectView(frontendUrl + "/login?verification=failed", false);
+        }
+        log.info("Account verification succeeded");
+        return new RedirectView(frontendUrl + "/login?verification=success", false);
     }
 }

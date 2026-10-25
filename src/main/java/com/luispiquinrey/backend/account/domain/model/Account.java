@@ -20,8 +20,12 @@ public class Account implements Serializable {
     private LockerPassword lockerPassword;
     private Date createdAt;
     private Date lastLoginAt;
+    private Integer version;
 
     public Account(AccountBuilder builder) {
+        if (builder.version != null && builder.version < 0) {
+            throw new IllegalArgumentException("account version cannot be negative");
+        }
         if (builder.id == null) {
             throw new IllegalArgumentException("id cannot be null");
         }
@@ -48,6 +52,7 @@ public class Account implements Serializable {
         this.lockerPassword = builder.lockerPassword;
         this.createdAt = builder.createdAt == null ? Date.now() : builder.createdAt;
         this.lastLoginAt = builder.lastLoginAt;
+        this.version = builder.version;
     }
 
     public UserId id() {
@@ -88,6 +93,18 @@ public class Account implements Serializable {
 
     public Date lastLoginAt() {
         return lastLoginAt;
+    }
+
+    /** Null identifies a new aggregate; otherwise this is its last persisted revision. */
+    public Integer version() {
+        return version;
+    }
+
+    public void recordVersion(Integer version) {
+        if (version == null || version < 0 || (this.version != null && version < this.version)) {
+            throw new IllegalArgumentException("account version must be nonnegative and cannot move backwards");
+        }
+        this.version = version;
     }
 
     public void verify() {
@@ -169,6 +186,7 @@ public class Account implements Serializable {
         private LockerPassword lockerPassword;
         private Date createdAt;
         private Date lastLoginAt;
+        private Integer version;
 
         public AccountBuilder id(UserId id) {
             this.id = id;
@@ -217,6 +235,11 @@ public class Account implements Serializable {
 
         public AccountBuilder lastLoginAt(Date lastLoginAt) {
             this.lastLoginAt = lastLoginAt;
+            return this;
+        }
+
+        public AccountBuilder version(Integer version) {
+            this.version = version;
             return this;
         }
 

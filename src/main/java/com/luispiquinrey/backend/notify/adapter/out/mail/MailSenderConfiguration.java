@@ -1,23 +1,18 @@
 package com.luispiquinrey.backend.notify.adapter.out.mail;
 
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
-import com.luispiquinrey.backend.notify.application.service.SendVerificationEmailService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @Configuration
-@EnableAsync
-@Import(SendVerificationEmailService.class)
 public class MailSenderConfiguration {
 
     @Bean

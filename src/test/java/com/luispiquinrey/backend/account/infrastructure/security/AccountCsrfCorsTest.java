@@ -1,9 +1,14 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
-import com.luispiquinrey.backend.account.application.dto.AccountView;
-import com.luispiquinrey.backend.account.application.dto.RegisterAccountCommand;
-import com.luispiquinrey.backend.account.application.service.RegisterAccountService;
+import com.luispiquinrey.backend.account.application.dto.response.AccountResponse;
+import com.luispiquinrey.backend.account.infrastructure.config.TestSecurityConfig;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.account.application.dto.request.RegisterAccountRequest;
+import com.luispiquinrey.backend.account.application.use_cases.RegisterAccountUseCase;
 import com.luispiquinrey.backend.account.presentation.rest.RegisterAccountController;
+import com.luispiquinrey.backend.account.presentation.presenter.RegisterAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -26,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = RegisterAccountController.class,
         properties = "app.frontend-url=https://notes.example.test")
-@Import(TestSecurityConfig.class)
+@Import({TestSecurityConfig.class, RegisterAccountPresenter.class, ErrorPresenter.class, HttpResponsePresenter.class})
 class AccountCsrfCorsTest {
 
     private static final String FRONTEND_ORIGIN = "https://notes.example.test";
@@ -36,13 +41,13 @@ class AccountCsrfCorsTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private RegisterAccountService service;
+    private RegisterAccountUseCase service;
 
     @Test
     @Timeout(1)
     @Tag("accountCsrfCors")
     void shouldProcessMutatingRequestWithoutCsrfToken() throws Exception {
-        when(service.register(any(RegisterAccountCommand.class))).thenReturn(accountView());
+        when(service.register(any(RegisterAccountRequest.class))).thenReturn(Result.success(accountView()));
 
         mockMvc.perform(post("/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,8 +80,8 @@ class AccountCsrfCorsTest {
                 .andExpect(status().isForbidden());
     }
 
-    private AccountView accountView() {
-        return new AccountView(
+    private AccountResponse accountView() {
+        return new AccountResponse(
                 "507f1f77bcf86cd799439011",
                 "user@example.com",
                 "V1StGXR8_Z5j",

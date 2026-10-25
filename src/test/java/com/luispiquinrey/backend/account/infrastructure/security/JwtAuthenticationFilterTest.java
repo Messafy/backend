@@ -20,7 +20,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -29,11 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class JwtAuthenticationFilterTest {
@@ -56,8 +51,7 @@ class JwtAuthenticationFilterTest {
         when(userDetailsService.loadUserByUsername(EMAIL)).thenReturn(userDetails);
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(
                 new SpringJwtTokenVerifier(SECRET),
-                userDetailsService,
-                mock(HandlerExceptionResolver.class)
+                userDetailsService
         );
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + new SpringJwtTokenIssuer(SECRET).issue(account()));
@@ -77,8 +71,7 @@ class JwtAuthenticationFilterTest {
     void shouldNotAuthenticateRequestsWithoutBearerTokens() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(
                 new SpringJwtTokenVerifier(SECRET),
-                mock(UserDetailsService.class),
-                mock(HandlerExceptionResolver.class)
+                mock(UserDetailsService.class)
         );
         AtomicReference<Authentication> authentication = new AtomicReference<>();
 
@@ -92,12 +85,10 @@ class JwtAuthenticationFilterTest {
     @Test
     @Timeout(1)
     @Tag("jwtAuthenticationFilter")
-    void shouldDelegateInvalidBearerTokensWithoutAuthenticating() throws Exception {
-        HandlerExceptionResolver exceptionResolver = mock(HandlerExceptionResolver.class);
+    void shouldRejectInvalidBearerTokensWithoutAuthenticating() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(
                 new SpringJwtTokenVerifier(SECRET),
-                mock(UserDetailsService.class),
-                exceptionResolver
+                mock(UserDetailsService.class)
         );
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + tokenSignedWithAnotherKey());
@@ -105,7 +96,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> { });
 
-        verify(exceptionResolver).resolveException(eq(request), eq(response), isNull(), any(Exception.class));
+        assertEquals(401, response.getStatus());
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 

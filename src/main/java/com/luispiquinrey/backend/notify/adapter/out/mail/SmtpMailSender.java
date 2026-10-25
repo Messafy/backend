@@ -1,7 +1,6 @@
 package com.luispiquinrey.backend.notify.adapter.out.mail;
 
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
-import com.luispiquinrey.backend.notify.application.exception.MailDeliveryException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;

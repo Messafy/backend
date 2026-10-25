@@ -84,6 +84,35 @@ class SpringJwtTokenVerifierTest {
         assertFalse(new SpringJwtTokenVerifier(SECRET).isTokenValid(token, user));
     }
 
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void shouldRejectDisabledLockedExpiredAccountsAndExpiredCredentials() {
+        String token = new SpringJwtTokenIssuer(SECRET).issue(account());
+        var verifier = new SpringJwtTokenVerifier(SECRET);
+        for (UserDetails user : new UserDetails[]{
+                User.withUsername(EMAIL).password("unused").roles("USER").disabled(true).build(),
+                User.withUsername(EMAIL).password("unused").roles("USER").accountLocked(true).build(),
+                User.withUsername(EMAIL).password("unused").roles("USER").accountExpired(true).build(),
+                User.withUsername(EMAIL).password("unused").roles("USER").credentialsExpired(true).build()}) {
+            assertFalse(verifier.isTokenValid(token, user));
+        }
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void shouldRejectTokensWithoutExpirationAndMalformedTokens() {
+        var verifier = new SpringJwtTokenVerifier(SECRET);
+        UserDetails user = User.withUsername(EMAIL).password("unused").roles("USER").build();
+        String withoutExpiration = Jwts.builder().claim("email", EMAIL)
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256).compact();
+
+        assertFalse(verifier.isTokenValid(withoutExpiration, user));
+        assertFalse(verifier.isTokenValid("malformed", user));
+        assertFalse(verifier.isTokenValid("", user));
+    }
+
     private Account account() {
         return new Account.AccountBuilder()
                 .id(new UserId("507f1f77bcf86cd799439011"))

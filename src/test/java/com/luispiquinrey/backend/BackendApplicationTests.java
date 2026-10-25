@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.aop.support.AopUtils;
 import com.luispiquinrey.backend.account.api.AccountLookup;
-import com.luispiquinrey.backend.notes.application.service.GetNoteService;
+import com.luispiquinrey.backend.notes.application.use_cases.GetNoteUseCase;
 import com.luispiquinrey.backend.notify.application.port.in.SendVerificationEmailUseCase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -47,7 +47,7 @@ class BackendApplicationTests {
     @Tag("executionLogging")
     void applicationServicesAreInstrumentedAcrossContexts() {
         org.junit.jupiter.api.Assertions.assertTrue(AopUtils.isAopProxy(context.getBean(AccountLookup.class)));
-        org.junit.jupiter.api.Assertions.assertTrue(AopUtils.isAopProxy(context.getBean(GetNoteService.class)));
+        org.junit.jupiter.api.Assertions.assertTrue(AopUtils.isAopProxy(context.getBean(GetNoteUseCase.class)));
         org.junit.jupiter.api.Assertions.assertTrue(AopUtils.isAopProxy(context.getBean(SendVerificationEmailUseCase.class)));
     }
 

@@ -1,7 +1,10 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
-import com.luispiquinrey.backend.account.application.dto.AccountView;
-import com.luispiquinrey.backend.account.application.service.GetAccountService;
+import com.luispiquinrey.backend.account.application.dto.response.AccountResponse;
+import com.luispiquinrey.backend.account.infrastructure.config.TestSecurityConfig;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.account.application.dto.request.GetAccountRequest;
+import com.luispiquinrey.backend.account.application.use_cases.GetAccountUseCase;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
 import com.luispiquinrey.backend.account.domain.model.Email;
@@ -10,6 +13,9 @@ import com.luispiquinrey.backend.account.domain.model.LockerPassword;
 import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.model.Role;
 import com.luispiquinrey.backend.account.presentation.rest.GetAccountController;
+import com.luispiquinrey.backend.account.presentation.presenter.GetAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import com.luispiquinrey.backend.share.identity.UserId;
 import com.luispiquinrey.backend.share.time.Date;
 import org.junit.jupiter.api.Tag;
@@ -29,7 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(GetAccountController.class)
-@Import(TestSecurityConfig.class)
+@Import({TestSecurityConfig.class, GetAccountPresenter.class, ErrorPresenter.class, HttpResponsePresenter.class})
 class AccountAuthorizationTest {
 
     private static final String ACCOUNT_ID = "507f1f77bcf86cd799439011";
@@ -38,7 +44,7 @@ class AccountAuthorizationTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private GetAccountService service;
+    private GetAccountUseCase service;
 
     @Test
     @Timeout(1)
@@ -53,7 +59,7 @@ class AccountAuthorizationTest {
     @Tag("accountAuthorization")
     void shouldAllowUsersToReadTheirCurrentAccount() throws Exception {
         Account account = account(Role.USER);
-        when(service.getMyAccount(account.id())).thenReturn(AccountView.from(account));
+        when(service.getMyAccount(new GetAccountRequest(account.id().id()))).thenReturn(Result.success(AccountResponse.from(account)));
 
         mockMvc.perform(get("/v1/accounts/me").with(user(new AccountUserDetails(account))))
                 .andExpect(status().isOk());
@@ -73,7 +79,7 @@ class AccountAuthorizationTest {
     @Tag("accountAuthorization")
     void shouldAllowAdminsToReadAccountsById() throws Exception {
         Account account = account(Role.ADMIN);
-        when(service.findById(ACCOUNT_ID)).thenReturn(AccountView.from(account));
+        when(service.findById(new GetAccountRequest(ACCOUNT_ID))).thenReturn(Result.success(AccountResponse.from(account)));
 
         mockMvc.perform(get("/v1/accounts/{id}", ACCOUNT_ID)
                         .with(user(new AccountUserDetails(account))))

@@ -1,8 +1,8 @@
 package com.luispiquinrey.backend.notify.application.port.in;
 
-import com.luispiquinrey.backend.account.api.AccountRegistered;
+import com.luispiquinrey.backend.notify.application.dto.SendVerificationEmailRequest;
 
 public interface SendVerificationEmailUseCase {
 
-    void handle(AccountRegistered event);
+    void send(SendVerificationEmailRequest request);
 }

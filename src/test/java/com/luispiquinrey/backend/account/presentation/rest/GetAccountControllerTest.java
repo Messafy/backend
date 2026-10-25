@@ -1,7 +1,13 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
-import com.luispiquinrey.backend.account.application.dto.AccountView;
-import com.luispiquinrey.backend.account.application.service.GetAccountService;
+import com.luispiquinrey.backend.account.application.dto.response.AccountResponse;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.account.application.dto.request.GetAccountRequest;
+import com.luispiquinrey.backend.account.application.use_cases.GetAccountUseCase;
+import com.luispiquinrey.backend.account.presentation.presenter.GetAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
 import com.luispiquinrey.backend.account.domain.model.Email;
@@ -42,13 +48,15 @@ class GetAccountControllerTest {
     @Timeout(3)
     @Tag("getAccountController")
     void shouldReturnAccountForPathId() throws Exception {
-        GetAccountService service = mock(GetAccountService.class);
-        when(service.findById(ACCOUNT_ID)).thenReturn(AccountView.from(account()));
+        GetAccountUseCase service = mock(GetAccountUseCase.class);
+        when(service.findById(new GetAccountRequest(ACCOUNT_ID))).thenReturn(Result.success(AccountResponse.from(account())));
 
         mockMvc(service).perform(get("/v1/accounts/{id}", ACCOUNT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ACCOUNT_ID))
-                .andExpect(jsonPath("$.email").value("user@example.com"));
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.createdAt").value("2026-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$.lastLoginAt").value("2026-01-02T10:00:00Z"));
     }
 
     @Test
@@ -56,19 +64,34 @@ class GetAccountControllerTest {
     @Tag("getAccountController")
     void shouldReturnCurrentAccount() throws Exception {
         Account account = account();
-        GetAccountService service = mock(GetAccountService.class);
-        when(service.getMyAccount(account.id())).thenReturn(AccountView.from(account));
+        GetAccountUseCase service = mock(GetAccountUseCase.class);
+        when(service.getMyAccount(new GetAccountRequest(account.id().id()))).thenReturn(Result.success(AccountResponse.from(account)));
 
         mockMvc(service).perform(get("/v1/accounts/me").with(user(new AccountUserDetails(account()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ACCOUNT_ID));
     }
 
-    private MockMvc mockMvc(GetAccountService service) {
-        return MockMvcBuilders.standaloneSetup(new GetAccountController(service))
+    private MockMvc mockMvc(GetAccountUseCase service) {
+        return MockMvcBuilders.standaloneSetup(new GetAccountController(
+                        service, new GetAccountPresenter(new ErrorPresenter()), new HttpResponsePresenter()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .addFilter(new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository()))
                 .build();
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("getAccountController")
+    void shouldReturnNotFoundForFailedLookupResult() throws Exception {
+        GetAccountUseCase service = mock(GetAccountUseCase.class);
+        when(service.findById(new GetAccountRequest(ACCOUNT_ID)))
+                .thenReturn(Result.failure(ApplicationError.notFoundError("account not found: " + ACCOUNT_ID)));
+
+        mockMvc(service).perform(get("/v1/accounts/{id}", ACCOUNT_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("account not found: " + ACCOUNT_ID))
+                .andExpect(jsonPath("$.code").value("NOT_FOUND_ERROR"));
     }
 
     private Account account() {

@@ -1,6 +1,11 @@
 package com.luispiquinrey.backend.account.infrastructure.persistence;
 
 import com.luispiquinrey.backend.account.domain.model.Account;
+import com.luispiquinrey.backend.account.domain.exception.AccountConflictException;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.mockito.ArgumentCaptor;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
 import com.luispiquinrey.backend.account.domain.model.LockerPassword;
@@ -24,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -117,79 +123,81 @@ class AccountRepositoryAdapterTest {
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
     void shouldInsertNewDocumentWhenAccountDoesNotExist() {
-        ObjectId objectId = new ObjectId(ACCOUNT_ID);
         Account account = account();
-        AccountDocument document = accountDocument(objectId);
-        when(mapper.toObjectId(ACCOUNT_ID)).thenReturn(objectId);
-        when(mongoRepository.findById(objectId)).thenReturn(Optional.empty());
-        when(mapper.toDocument(account)).thenReturn(document);
+        prepareSuccessfulWrite();
 
-        repository.save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
 
-        verify(mapper).toDocument(account);
-        verify(mongoRepository).save(document);
+        assertEquals(0, account.version());
+        verify(mongoRepository, never()).findById(any());
     }
 
     @Test
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
-    void shouldNotMapNewDocumentWhenAccountAlreadyExists() {
-        ObjectId objectId = new ObjectId(ACCOUNT_ID);
+    void shouldUseTheOriginalSnapshotVersionWithoutReloadingTheDocument() {
         Account account = account(new Date(Instant.parse("2026-09-12T08:30:00Z")));
-        AccountDocument document = accountDocument(objectId);
-        when(mapper.toObjectId(ACCOUNT_ID)).thenReturn(objectId);
-        when(mongoRepository.findById(objectId)).thenReturn(Optional.of(document));
+        account.recordVersion(3);
+        var submittedVersion = new java.util.concurrent.atomic.AtomicReference<Integer>();
+        when(mongoRepository.save(any(AccountDocument.class))).thenAnswer(invocation -> {
+            AccountDocument document = invocation.getArgument(0);
+            submittedVersion.set(document.getVersion());
+            document.setVersion(document.getVersion() + 1);
+            return document;
+        });
 
-        repository.save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
 
-        verify(mapper, never()).toDocument(any());
-        verify(mongoRepository).save(document);
+        assertEquals(3, submittedVersion.get());
+        assertEquals(4, account.version());
+        verify(mongoRepository, never()).findById(any());
     }
 
     @Test
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
     void shouldUpdateLastLoginOnExistingDocument() {
-        ObjectId objectId = new ObjectId(ACCOUNT_ID);
         Account account = account(new Date(Instant.parse("2026-09-12T08:30:00Z")));
-        AccountDocument document = accountDocument(objectId);
-        when(mapper.toObjectId(ACCOUNT_ID)).thenReturn(objectId);
-        when(mongoRepository.findById(objectId)).thenReturn(Optional.of(document));
+        account.recordVersion(0);
+        prepareSuccessfulWrite();
 
-        repository.save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
 
+        var captor = ArgumentCaptor.forClass(AccountDocument.class);
+        verify(mongoRepository).save(captor.capture());
+        AccountDocument document = captor.getValue();
         assertEquals("2026-09-12T08:30:00Z", document.getLastLoginAt());
-        verify(mongoRepository).save(document);
+        assertEquals(1, account.version());
     }
 
     @Test
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
     void shouldKeepNullLastLoginOnExistingDocument() {
-        ObjectId objectId = new ObjectId(ACCOUNT_ID);
         Account account = account(null);
-        AccountDocument document = accountDocument(objectId);
-        when(mapper.toObjectId(ACCOUNT_ID)).thenReturn(objectId);
-        when(mongoRepository.findById(objectId)).thenReturn(Optional.of(document));
+        account.recordVersion(0);
+        prepareSuccessfulWrite();
 
-        repository.save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
 
-        assertNull(document.getLastLoginAt());
-        verify(mongoRepository).save(document);
+        var captor = ArgumentCaptor.forClass(AccountDocument.class);
+        verify(mongoRepository).save(captor.capture());
+        assertNull(captor.getValue().getLastLoginAt());
     }
 
     @Test
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
     void shouldUpdateAllFieldsOnExistingDocument() {
-        ObjectId objectId = new ObjectId(ACCOUNT_ID);
         Account account = account(new Date(Instant.parse("2026-09-12T08:30:00Z")));
-        AccountDocument document = accountDocument(objectId);
-        when(mapper.toObjectId(ACCOUNT_ID)).thenReturn(objectId);
-        when(mongoRepository.findById(objectId)).thenReturn(Optional.of(document));
+        account.recordVersion(0);
+        prepareSuccessfulWrite();
 
-        repository.save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
 
+        var captor = ArgumentCaptor.forClass(AccountDocument.class);
+        verify(mongoRepository).save(captor.capture());
+        AccountDocument document = captor.getValue();
         assertEquals(EMAIL, document.getEmail());
         assertEquals(ENCODED_PASSWORD, document.getEncodedPassword());
         assertEquals("USER", document.getRole());
@@ -197,7 +205,41 @@ class AccountRepositoryAdapterTest {
         assertFalse(document.isVerified());
         assertEquals(PUBLIC_CODE, document.getPublicCode());
         assertEquals(ENCODED_LOCKER, document.getEncodedLockerPassword());
-        verify(mongoRepository).save(document);
+        assertEquals(account.createdAt().value().toString(), document.getCreatedAt());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountRepositoryAdapter")
+    void shouldTranslateOnlyExpectedWriteConflictsWithoutAdvancingVersion() {
+        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper());
+        Account account = account();
+        account.recordVersion(2);
+        for (RuntimeException failure : new RuntimeException[]{new DuplicateKeyException("synthetic duplicate"),
+                new OptimisticLockingFailureException("synthetic stale write")}) {
+            when(mongoRepository.save(any(AccountDocument.class))).thenThrow(failure);
+            assertThrows(AccountConflictException.class, () -> adapter.save(account));
+            assertEquals(2, account.version());
+        }
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountRepositoryAdapter")
+    void shouldNotDisguiseDatabaseOutagesAsBusinessConflicts() {
+        var failure = new DataAccessResourceFailureException("synthetic outage");
+        when(mongoRepository.save(any(AccountDocument.class))).thenThrow(failure);
+        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper());
+
+        assertSame(failure, assertThrows(DataAccessResourceFailureException.class, () -> adapter.save(account())));
+    }
+
+    private void prepareSuccessfulWrite() {
+        when(mongoRepository.save(any(AccountDocument.class))).thenAnswer(invocation -> {
+            AccountDocument document = invocation.getArgument(0);
+            document.setVersion(document.getVersion() == null ? 0 : document.getVersion() + 1);
+            return document;
+        });
     }
 
     private Account account(Date lastLoginAt) {

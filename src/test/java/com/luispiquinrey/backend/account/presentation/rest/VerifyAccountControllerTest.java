@@ -1,6 +1,12 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
-import com.luispiquinrey.backend.account.application.service.VerifyAccountService;
+import com.luispiquinrey.backend.account.application.use_cases.VerifyAccountUseCase;
+import com.luispiquinrey.backend.account.presentation.presenter.VerifyAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.account.application.dto.request.VerifyAccountRequest;
+import com.luispiquinrey.backend.account.application.dto.response.VerifyAccountResponse;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.share.result.ApplicationError;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -12,10 +18,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,11 +34,11 @@ class VerifyAccountControllerTest {
     @Test
     @ExtendWith(OutputCaptureExtension.class)
     void shouldNotLogUntrustedExceptionMessage(CapturedOutput output) {
-        VerifyAccountService service = mock(VerifyAccountService.class);
+        VerifyAccountUseCase service = mock(VerifyAccountUseCase.class);
         doThrow(new IllegalArgumentException("invalid token\r\nFORGED_VERIFICATION"))
-                .when(service).verifyByToken("invalid-token");
+                .when(service).verifyByToken(new VerifyAccountRequest("invalid-token"));
 
-        var response = new VerifyAccountController(service, FRONTEND_URL).verify("invalid-token");
+        var response = new VerifyAccountController(service, new VerifyAccountPresenter(new ErrorPresenter()), FRONTEND_URL).verify("invalid-token");
 
         assertEquals(FRONTEND_URL + "/login?verification=failed", response.getUrl());
         assertFalse(output.getAll().contains("FORGED_VERIFICATION"));
@@ -42,22 +49,23 @@ class VerifyAccountControllerTest {
     @Timeout(3)
     @Tag("verifyAccountController")
     void shouldRedirectToSuccessfulVerificationAtVerificationPath() throws Exception {
-        VerifyAccountService service = mock(VerifyAccountService.class);
-        doNothing().when(service).verifyByToken("valid-token");
+        VerifyAccountUseCase service = mock(VerifyAccountUseCase.class);
+        when(service.verifyByToken(new VerifyAccountRequest("valid-token"))).thenReturn(Result.success(new VerifyAccountResponse(true)));
 
         mockMvc(service).perform(get("/v1/auth/verify").param("token", "valid-token"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(FRONTEND_URL + "/login?verification=success"));
 
-        verify(service).verifyByToken("valid-token");
+        verify(service).verifyByToken(new VerifyAccountRequest("valid-token"));
     }
 
     @Test
     @Timeout(3)
     @Tag("verifyAccountController")
-    void shouldRedirectToFailedVerificationWhenServiceFails() throws Exception {
-        VerifyAccountService service = mock(VerifyAccountService.class);
-        doThrow(new IllegalArgumentException("invalid token")).when(service).verifyByToken("invalid-token");
+    void shouldRedirectToFailedVerificationWhenUseCaseReturnsFailure() throws Exception {
+        VerifyAccountUseCase service = mock(VerifyAccountUseCase.class);
+        when(service.verifyByToken(new VerifyAccountRequest("invalid-token")))
+                .thenReturn(Result.failure(ApplicationError.validationError("invalid verification token")));
 
         mockMvc(service).perform(get("/v1/auth/verify").param("token", "invalid-token"))
                 .andExpect(status().is3xxRedirection())
@@ -68,13 +76,26 @@ class VerifyAccountControllerTest {
     @Timeout(3)
     @Tag("verifyAccountController")
     void shouldRequireVerificationToken() throws Exception {
-        VerifyAccountService service = mock(VerifyAccountService.class);
+        VerifyAccountUseCase service = mock(VerifyAccountUseCase.class);
 
         mockMvc(service).perform(get("/v1/auth/verify"))
                 .andExpect(status().isBadRequest());
     }
 
-    private MockMvc mockMvc(VerifyAccountService service) {
-        return MockMvcBuilders.standaloneSetup(new VerifyAccountController(service, FRONTEND_URL)).build();
+    private MockMvc mockMvc(VerifyAccountUseCase service) {
+        return MockMvcBuilders.standaloneSetup(new VerifyAccountController(service, new VerifyAccountPresenter(new ErrorPresenter()), FRONTEND_URL)).build();
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("verifyAccountController")
+    void shouldPresentBlankTokenValidationWithoutInvokingUseCase() throws Exception {
+        VerifyAccountUseCase service = mock(VerifyAccountUseCase.class);
+
+        mockMvc(service).perform(get("/v1/auth/verify").param("token", " "))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(FRONTEND_URL + "/login?verification=failed"));
+
+        verifyNoInteractions(service);
     }
 }

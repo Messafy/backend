@@ -1,9 +1,11 @@
 package com.luispiquinrey.backend.account.infrastructure.persistence;
 
 import com.luispiquinrey.backend.account.domain.model.Account;
+import com.luispiquinrey.backend.account.domain.exception.AccountConflictException;
 import com.luispiquinrey.backend.account.domain.repository.AccountRepository;
 import com.luispiquinrey.backend.share.identity.UserId;
-import com.luispiquinrey.backend.share.time.Date;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -53,27 +55,14 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public void save(Account account) {
         log.debug("Persisting account {} in MongoDB", account.id().id());
-        mongoDataAccountRepository.findById(accountMapper.toObjectId(account.id().id()))
-                .ifPresentOrElse(
-                        document -> updateExistingDocument(document, account),
-                        () -> mongoDataAccountRepository.save(accountMapper.toDocument(account))
-                );
+        try {
+            AccountDocument saved = mongoDataAccountRepository.save(accountMapper.toDocument(account));
+            account.recordVersion(saved.getVersion());
+        } catch (DuplicateKeyException exception) {
+            throw new AccountConflictException("account identity, email or public code already exists");
+        } catch (OptimisticLockingFailureException exception) {
+            throw new AccountConflictException("account was modified concurrently; reload and retry");
+        }
         log.debug("MongoDB persisted account {}", account.id().id());
-    }
-
-    private void updateExistingDocument(AccountDocument document, Account account) {
-        document.setEmail(account.email().email());
-        document.setEncodedPassword(account.encodedPassword().value());
-        document.setRole(account.role().name());
-        document.setAccountStatus(account.status().name());
-        document.setVerified(account.isVerified());
-        document.setPublicCode(account.publicCode().value());
-        document.setEncodedLockerPassword(account.lockerPassword().value());
-        document.setLastLoginAt(toIsoString(account.lastLoginAt()));
-        mongoDataAccountRepository.save(document);
-    }
-
-    private String toIsoString(Date date) {
-        return date == null ? null : date.value().toString();
     }
 }

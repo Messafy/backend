@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.notify.adapter.in.events;
 
 import com.luispiquinrey.backend.account.api.AccountRegistered;
+import com.luispiquinrey.backend.notify.application.dto.SendVerificationEmailRequest;
 import com.luispiquinrey.backend.notify.application.port.in.SendVerificationEmailUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,7 @@ public class AccountRegisteredListener {
     @EventListener
     public void onAccountRegistered(AccountRegistered event) {
         log.debug("Handling account registered event for account {}", event.accountId());
-        sendVerificationEmailUseCase.handle(event);
+        sendVerificationEmailUseCase.send(
+                new SendVerificationEmailRequest(event.accountId(), event.email()));
     }
 }

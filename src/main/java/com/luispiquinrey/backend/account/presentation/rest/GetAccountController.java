@@ -1,10 +1,14 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
-import com.luispiquinrey.backend.account.application.dto.AccountView;
-import com.luispiquinrey.backend.account.application.service.GetAccountService;
+import com.luispiquinrey.backend.account.application.dto.request.GetAccountRequest;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.share.result.Result;
+import com.luispiquinrey.backend.account.application.use_cases.GetAccountUseCase;
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
-import com.luispiquinrey.backend.share.identity.UserId;
-import com.luispiquinrey.backend.account.presentation.dto.AccountGetResponse;
+import com.luispiquinrey.backend.account.presentation.viewmodel.AccountViewModel;
+import com.luispiquinrey.backend.account.presentation.presenter.GetAccountPresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,7 +19,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -28,10 +31,17 @@ public class GetAccountController {
 
     private static final Logger log = LoggerFactory.getLogger(GetAccountController.class);
 
-    private final GetAccountService service;
+    private final GetAccountUseCase getAccountUseCase;
+    private final GetAccountPresenter presenter;
+    private final HttpResponsePresenter httpResponsePresenter;
 
-    public GetAccountController(GetAccountService service) {
-        this.service = service;
+    public GetAccountController(
+            GetAccountUseCase getAccountUseCase,
+            GetAccountPresenter presenter,
+            HttpResponsePresenter httpResponsePresenter) {
+        this.getAccountUseCase = getAccountUseCase;
+        this.presenter = presenter;
+        this.httpResponsePresenter = httpResponsePresenter;
     }
 
     @Operation(
@@ -44,7 +54,7 @@ public class GetAccountController {
                     description = "Current account found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = AccountGetResponse.class))),
+                            schema = @Schema(implementation = AccountViewModel.class))),
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired JWT",
@@ -58,13 +68,18 @@ public class GetAccountController {
                     description = "Account no longer exists",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ProblemDetail.class)))})
+                            schema = @Schema(implementation = ErrorViewModel.class)))})
     @GetMapping("/me")
-    public ResponseEntity<AccountGetResponse> me(@AuthenticationPrincipal AuthenticatedUser principal) {
+    public ResponseEntity<?> me(@AuthenticationPrincipal AuthenticatedUser principal) {
         log.info("Received request to get current account");
-        AccountView accountView = service.getMyAccount(new UserId(principal.accountId()));
-        log.info("Returning current account");
-        return ResponseEntity.ok(AccountGetResponse.from(accountView));
+        GetAccountRequest input;
+        try {
+            input = new GetAccountRequest(principal.accountId());
+        } catch (IllegalArgumentException e) {
+            return httpResponsePresenter.toHttp(
+                    presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))));
+        }
+        return httpResponsePresenter.toHttp(presenter.present(getAccountUseCase.getMyAccount(input)));
     }
 
     @Operation(
@@ -76,13 +91,13 @@ public class GetAccountController {
                     description = "Account found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = AccountGetResponse.class))),
+                            schema = @Schema(implementation = AccountViewModel.class))),
             @ApiResponse(
                     responseCode = "400",
                     description = "Malformed account id",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ProblemDetail.class))),
+                            schema = @Schema(implementation = ErrorViewModel.class))),
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired JWT",
@@ -96,14 +111,19 @@ public class GetAccountController {
                     description = "No account exists with the given id",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ProblemDetail.class)))})
+                            schema = @Schema(implementation = ErrorViewModel.class)))})
     @GetMapping("/{id}")
-    public ResponseEntity<AccountGetResponse> getById(
+    public ResponseEntity<?> getById(
             @Parameter(description = "Account id as MongoDB ObjectId string", example = "507f1f77bcf86cd799439011")
             @PathVariable String id) {
         log.info("Received request to get account by id");
-        AccountView accountView = service.findById(id);
-        log.info("Returning account requested by id");
-        return ResponseEntity.ok(AccountGetResponse.from(accountView));
+        GetAccountRequest input;
+        try {
+            input = new GetAccountRequest(id);
+        } catch (IllegalArgumentException e) {
+            return httpResponsePresenter.toHttp(
+                    presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))));
+        }
+        return httpResponsePresenter.toHttp(presenter.present(getAccountUseCase.findById(input)));
     }
 }

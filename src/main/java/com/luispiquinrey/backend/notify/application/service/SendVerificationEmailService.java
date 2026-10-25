@@ -1,7 +1,7 @@
 package com.luispiquinrey.backend.notify.application.service;
 
-import com.luispiquinrey.backend.account.api.AccountRegistered;
 import com.luispiquinrey.backend.account.api.VerificationTokenIssuer;
+import com.luispiquinrey.backend.notify.application.dto.SendVerificationEmailRequest;
 import com.luispiquinrey.backend.notify.application.port.in.SendVerificationEmailUseCase;
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
 import com.luispiquinrey.backend.share.logging.Logger;
@@ -20,9 +20,9 @@ public class SendVerificationEmailService implements SendVerificationEmailUseCas
     }
 
     @Override
-    public void handle(AccountRegistered event) {
-        log.debug("Sending verification email for account {}", event.accountId());
-        mailSender.sendVerification(event.email(), verificationTokenIssuer.issue(event.accountId()));
-        log.debug("Sent verification email for account {}", event.accountId());
+    public void send(SendVerificationEmailRequest request) {
+        log.debug("Sending verification email for account {}", request.accountId());
+        mailSender.sendVerification(request.email(), verificationTokenIssuer.issue(request.accountId()));
+        log.debug("Sent verification email for account {}", request.accountId());
     }
 }

@@ -1,84 +1,74 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
-import com.luispiquinrey.backend.notes.application.service.MarkNoteAsReadService;
-import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
-import com.luispiquinrey.backend.notes.domain.exception.NoteNotFoundException;
-import com.luispiquinrey.backend.notes.domain.model.Note;
-import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
-import com.luispiquinrey.backend.notes.presentation.dto.NoteMarkAsReadRequest;
-import com.luispiquinrey.backend.notes.presentation.dto.NoteMarkAsReadResponse;
+import com.luispiquinrey.backend.notes.application.dto.response.ReadNoteResponse;
+import com.luispiquinrey.backend.notes.application.port.MarkNoteAsReadPort;
+import com.luispiquinrey.backend.notes.presentation.presenter.MarkNoteAsReadPresenter;
+import com.luispiquinrey.backend.notes.presentation.viewmodel.MarkNoteAsReadViewModel;
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
+import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
+import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
+import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
+import com.luispiquinrey.backend.share.result.ApplicationError;
+import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doThrow;
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class MarkNoteAsReadControllerTest {
 
-    private static final AuthenticatedUser AUTHENTICATED_USER = () -> "507f1f77bcf86cd799439012";
+    private static final AuthenticatedUser USER = () -> "owner";
+
+    private final MarkNoteAsReadPort useCase = mock(MarkNoteAsReadPort.class);
+    private final MarkNoteAsReadController controller =
+            new MarkNoteAsReadController(
+                    useCase, new MarkNoteAsReadPresenter(new ErrorPresenter()), new HttpResponsePresenter());
 
     @Test
     @Timeout(1)
     @Tag("markNoteAsReadController")
-    void shouldReturnOkWithReadTimestampWhenMarkAsReadSucceeds() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-        note.markAsRead();
-        MarkNoteAsReadService service = mock(MarkNoteAsReadService.class);
-        when(service.markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012")).thenReturn(note);
+    void returnsReadReceipt() {
+        when(useCase.markAsRead(any())).thenReturn(Result.success(
+                new ReadNoteResponse("note", Instant.parse("2026-10-25T10:00:00Z"))));
 
-        ResponseEntity<NoteMarkAsReadResponse> response = new MarkNoteAsReadController(service)
-                .markAsRead(new NoteMarkAsReadRequest("507f1f77bcf86cd799439011"), AUTHENTICATED_USER);
+        var response = controller.markAsRead("note", USER);
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("507f1f77bcf86cd799439011", response.getBody().id());
-        assertNotNull(response.getBody().readAt());
-        verify(service).markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012");
+        assertEquals(200, response.getStatusCode().value());
+        var view = assertInstanceOf(MarkNoteAsReadViewModel.class, response.getBody());
+        assertEquals("note", view.id());
+        assertEquals("2026-10-25T10:00:00Z", view.readAt());
     }
 
     @Test
     @Timeout(1)
     @Tag("markNoteAsReadController")
-    void shouldPropagateNoteNotFoundFromService() {
-        MarkNoteAsReadService service = mock(MarkNoteAsReadService.class);
-        doThrow(new NoteNotFoundException("507f1f77bcf86cd799439011"))
-                .when(service).markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012");
+    void validatesBlankNoteId() {
+        var response = controller.markAsRead(" ", USER);
 
-        MarkNoteAsReadController controller = new MarkNoteAsReadController(service);
-
-        assertThrows(
-                NoteNotFoundException.class,
-                () -> controller.markAsRead(new NoteMarkAsReadRequest("507f1f77bcf86cd799439011"), AUTHENTICATED_USER)
-        );
+        assertEquals(400, response.getStatusCode().value());
+        verify(useCase, never()).markAsRead(any());
     }
 
     @Test
     @Timeout(1)
     @Tag("markNoteAsReadController")
-    void shouldPropagateConflictFromService() {
-        MarkNoteAsReadService service = mock(MarkNoteAsReadService.class);
-        doThrow(new NoteConflictException("cannot transition note from DELETED to READ"))
-                .when(service).markAsRead("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012");
+    void mapsForbiddenAndNotFoundErrors() {
+        when(useCase.markAsRead(any())).thenReturn(Result.failure(
+                ApplicationError.forbiddenError("only the owner or the shared recipient can mark a note as read")));
+        assertEquals(403, controller.markAsRead("note", USER).getStatusCode().value());
 
-        MarkNoteAsReadController controller = new MarkNoteAsReadController(service);
-
-        assertThrows(
-                NoteConflictException.class,
-                () -> controller.markAsRead(new NoteMarkAsReadRequest("507f1f77bcf86cd799439011"), AUTHENTICATED_USER)
-        );
+        when(useCase.markAsRead(any())).thenReturn(Result.failure(
+                ApplicationError.notFoundError("note not found")));
+        var response = controller.markAsRead("note", USER);
+        assertEquals(404, response.getStatusCode().value());
+        assertEquals("NOT_FOUND_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
     }
 }

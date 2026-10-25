@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -33,21 +35,20 @@ public class SpringJwtTokenVerifier implements JwtTokenVerifier {
 
     @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        try {
-            final String email = extractEmail(token);
-            boolean valid = userDetails.getUsername().equals(email) && !isTokenExpired(token);
-            if (!valid) {
-                log.debug("JWT validation failed for {}", userDetails.getUsername());
-            }
-            return valid;
-        } catch (JwtException exception) {
-            log.debug("JWT validation failed: {}", exception.getMessage());
+        if (userDetails == null) {
             return false;
         }
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractClaim(token, Claims::getExpiration).before(new Date());
+        try {
+            new AccountStatusUserDetailsChecker().check(userDetails);
+            return extractClaim(token, claims -> {
+                Date expiration = claims.getExpiration();
+                return userDetails.getUsername().equals(claims.get("email", String.class))
+                        && expiration != null && expiration.after(new Date());
+            });
+        } catch (JwtException | IllegalArgumentException | AuthenticationException exception) {
+            log.debug("JWT validation failed");
+            return false;
+        }
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

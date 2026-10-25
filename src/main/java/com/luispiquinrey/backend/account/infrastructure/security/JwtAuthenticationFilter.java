@@ -8,12 +8,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
+import io.jsonwebtoken.JwtException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
 
@@ -26,16 +29,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenVerifier jwtTokenVerifier;
     private final UserDetailsService userDetailsService;
-    private final HandlerExceptionResolver handlerExceptionResolver;
 
     public JwtAuthenticationFilter(
             JwtTokenVerifier jwtTokenVerifier,
-            UserDetailsService userDetailsService,
-            HandlerExceptionResolver handlerExceptionResolver
+            UserDetailsService userDetailsService
     ) {
         this.jwtTokenVerifier = jwtTokenVerifier;
         this.userDetailsService = userDetailsService;
-        this.handlerExceptionResolver = handlerExceptionResolver;
     }
 
     @Override
@@ -53,10 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             authenticate(jwt, request);
-            filterChain.doFilter(request, response);
-        } catch (Exception exception) {
-            handleAuthenticationFailure(request, response, exception);
+        } catch (JwtException | IllegalArgumentException | AuthenticationException exception) {
+            SecurityContextHolder.clearContext();
+            log.debug("JWT authentication failed");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
         }
+        filterChain.doFilter(request, response);
     }
 
     private String extractJwt(HttpServletRequest request) {
@@ -75,14 +78,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String userEmail = jwtTokenVerifier.extractEmail(jwt);
-        if (userEmail == null) {
-            return;
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new BadCredentialsException("invalid bearer token");
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+        new AccountStatusUserDetailsChecker().check(userDetails);
 
         if (!jwtTokenVerifier.isTokenValid(jwt, userDetails)) {
-            return;
+            throw new BadCredentialsException("invalid bearer token");
         }
 
         setAuthentication(userDetails, request);
@@ -103,12 +107,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 
-    private void handleAuthenticationFailure(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Exception exception
-    ) {
-        log.debug("JWT authentication failed: {}", exception.getMessage());
-        handlerExceptionResolver.resolveException(request, response, null, exception);
-    }
 }

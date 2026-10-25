@@ -1,6 +1,7 @@
 package com.luispiquinrey.backend.notify.adapter.in.events;
 
 import com.luispiquinrey.backend.account.api.AccountRegistered;
+import com.luispiquinrey.backend.notify.application.dto.SendVerificationEmailRequest;
 import com.luispiquinrey.backend.notify.application.port.in.SendVerificationEmailUseCase;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,6 @@ class AccountRegisteredListenerTest {
 
         listener.onAccountRegistered(event);
 
-        verify(useCase).handle(event);
+        verify(useCase).send(new SendVerificationEmailRequest(event.accountId(), event.email()));
     }
 }

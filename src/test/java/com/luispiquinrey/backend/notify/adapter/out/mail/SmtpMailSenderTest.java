@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.MailSendException;
-import com.luispiquinrey.backend.notify.application.exception.MailDeliveryException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

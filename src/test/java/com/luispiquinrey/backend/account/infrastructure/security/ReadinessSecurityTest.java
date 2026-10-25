@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
+import com.luispiquinrey.backend.account.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,9 +32,9 @@ class ReadinessSecurityTest {
             var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
             mvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
-            mvc.perform(get("/actuator/health")).andExpect(status().isForbidden());
-            mvc.perform(get("/actuator/health/liveness")).andExpect(status().isForbidden());
-            mvc.perform(post("/actuator/health/readiness")).andExpect(status().isForbidden());
+            mvc.perform(get("/actuator/health")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/actuator/health/liveness")).andExpect(status().isUnauthorized());
+            mvc.perform(post("/actuator/health/readiness")).andExpect(status().isUnauthorized());
         }
     }
 

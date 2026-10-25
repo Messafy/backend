@@ -3,7 +3,8 @@ package com.luispiquinrey.backend.notify.adapter.in.events;
 import com.luispiquinrey.backend.account.api.AccountRegistered;
 import com.luispiquinrey.backend.account.api.VerificationTokenIssuer;
 import com.luispiquinrey.backend.notify.adapter.out.mail.MailSenderConfiguration;
-import com.luispiquinrey.backend.notify.application.exception.MailDeliveryException;
+import com.luispiquinrey.backend.notify.infrastructure.config.NotifyConfiguration;
+import com.luispiquinrey.backend.notify.adapter.out.mail.MailDeliveryException;
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
 import com.luispiquinrey.backend.share.logging.Logger;
 import org.junit.jupiter.api.Tag;
@@ -38,7 +39,11 @@ class AccountRegisteredAsyncTest {
     }
 
     @TestConfiguration
-    @Import({MailSenderConfiguration.class, AccountRegisteredListener.class})
+    @Import({
+            MailSenderConfiguration.class,
+            NotifyConfiguration.class,
+            AccountRegisteredListener.class
+    })
     static class Config {
         final CountDownLatch delivered = new CountDownLatch(1);
         final AtomicReference<Thread> mailThread = new AtomicReference<>();

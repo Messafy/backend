@@ -1,7 +1,7 @@
 package com.luispiquinrey.backend.notify.application.service;
 
-import com.luispiquinrey.backend.account.api.AccountRegistered;
 import com.luispiquinrey.backend.account.api.VerificationTokenIssuer;
+import com.luispiquinrey.backend.notify.application.dto.SendVerificationEmailRequest;
 import com.luispiquinrey.backend.notify.application.port.out.MailSender;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class SendVerificationEmailServiceTest {
         when(tokenIssuer.issue(ACCOUNT_ID)).thenReturn(TOKEN);
         SendVerificationEmailService service = new SendVerificationEmailService(mailSender, tokenIssuer, mock(Logger.class));
 
-        service.handle(new AccountRegistered(ACCOUNT_ID, EMAIL));
+        service.send(new SendVerificationEmailRequest(ACCOUNT_ID, EMAIL));
 
         verify(tokenIssuer).issue(ACCOUNT_ID);
         verify(mailSender).sendVerification(EMAIL, TOKEN);
