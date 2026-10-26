@@ -19,7 +19,7 @@ public class MailSenderConfiguration {
     @Profile("!test")
     @ConditionalOnProperty("spring.mail.host")
     MailSender smtpMailSender(JavaMailSender javaMailSender,
-                              @Value("${spring.mail.username}") String from,
+                              @Value("${spring.mail.from:${spring.mail.username}}") String from,
                               @Value("${app.public-base-url}") String publicBaseUrl) throws IOException {
         String template = new ClassPathResource("mail/verification.html")
                 .getContentAsString(StandardCharsets.UTF_8);

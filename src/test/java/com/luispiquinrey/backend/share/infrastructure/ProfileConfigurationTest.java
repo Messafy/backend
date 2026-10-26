@@ -62,12 +62,33 @@ class ProfileConfigurationTest {
     @Test
     @Timeout(1)
     @Tag("profileConfiguration")
-    void smtpUsesOneTlsModeWithBoundedTimeouts() throws IOException {
+    void developmentSmtpUsesImplicitTls() throws IOException {
+        var env = profile("dev");
+        assertEquals("465", env.getProperty("spring.mail.port"));
+        assertEquals("true", env.getProperty("spring.mail.properties.mail.smtp.ssl.enable"));
+        assertEquals("false", env.getProperty("spring.mail.properties.mail.smtp.starttls.enable"));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("profileConfiguration")
+    void productionSmtpUsesResendWithRequiredStartTls() throws IOException {
+        var env = profile("prod");
+        assertEquals("smtp.resend.com", env.getProperty("spring.mail.host"));
+        assertEquals("587", env.getProperty("spring.mail.port"));
+        assertEquals("false", env.getProperty("spring.mail.properties.mail.smtp.ssl.enable"));
+        assertEquals("true", env.getProperty("spring.mail.properties.mail.smtp.starttls.enable"));
+        assertEquals("true", env.getProperty("spring.mail.properties.mail.smtp.starttls.required"));
+        env.setProperty("EMAIL_FROM", "no-reply@notes.example.com");
+        assertEquals("no-reply@notes.example.com", env.getProperty("spring.mail.from"));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("profileConfiguration")
+    void smtpUsesBoundedTimeouts() throws IOException {
         for (String profile : new String[]{"dev", "prod"}) {
             var env = profile(profile);
-            assertEquals("465", env.getProperty("spring.mail.port"));
-            assertEquals("true", env.getProperty("spring.mail.properties.mail.smtp.ssl.enable"));
-            assertEquals("false", env.getProperty("spring.mail.properties.mail.smtp.starttls.enable"));
             for (String timeout : new String[]{"connectiontimeout", "timeout", "writetimeout"}) {
                 assertEquals("5000", env.getProperty("spring.mail.properties.mail.smtp." + timeout));
             }

@@ -8,9 +8,20 @@ spring:
   mongodb:
     uri: ${MONGO_URI}
   mail:
-    host: smtp.gmail.com
+    host: smtp.resend.com
+    port: 587
     username: ${EMAIL_USERNAME}
     password: ${EMAIL_PASSWORD}
+    from: ${EMAIL_FROM}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: false
+          starttls:
+            enable: true
+            required: true
   output:
     ansi:
       enabled: NEVER
