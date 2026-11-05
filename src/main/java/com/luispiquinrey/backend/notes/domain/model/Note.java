@@ -20,6 +20,7 @@ public abstract class Note {
     private Date reportedAt;
     private List<Tag> tags;
     private boolean pinned;
+    private Integer version;
 
     {
         this.id = null;
@@ -97,6 +98,17 @@ public abstract class Note {
 
     public NoteId id() {
         return id;
+    }
+
+    public Integer version() {
+        return version;
+    }
+
+    public void recordVersion(Integer version) {
+        if (version == null || version < 0 || (this.version != null && version < this.version)) {
+            throw new IllegalArgumentException("note version must be nonnegative and cannot move backwards");
+        }
+        this.version = version;
     }
 
     public Title title() {

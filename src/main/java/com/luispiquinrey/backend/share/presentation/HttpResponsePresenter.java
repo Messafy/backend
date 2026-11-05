@@ -30,6 +30,6 @@ public class HttpResponsePresenter {
             case "CONFLICT_ERROR" -> HttpStatus.CONFLICT;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
-        return ResponseEntity.status(status).body(error);
+        return ResponseEntity.status(status).body(Problems.of(status, error.code(), error.message()));
     }
 }

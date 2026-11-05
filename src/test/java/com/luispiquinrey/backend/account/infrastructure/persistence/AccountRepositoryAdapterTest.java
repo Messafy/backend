@@ -6,6 +6,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.UpdateDefinition;
 import com.luispiquinrey.backend.account.domain.model.Email;
 import com.luispiquinrey.backend.account.domain.model.EncodedPassword;
 import com.luispiquinrey.backend.account.domain.model.LockerPassword;
@@ -31,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,6 +53,9 @@ class AccountRepositoryAdapterTest {
 
     @Mock
     private AccountMapper mapper;
+
+    @Mock
+    private MongoTemplate mongoTemplate;
 
     @InjectMocks
     private AccountRepositoryAdapter repository;
@@ -126,7 +133,7 @@ class AccountRepositoryAdapterTest {
         Account account = account();
         prepareSuccessfulWrite();
 
-        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).save(account);
 
         assertEquals(0, account.version());
         verify(mongoRepository, never()).findById(any());
@@ -146,7 +153,7 @@ class AccountRepositoryAdapterTest {
             return document;
         });
 
-        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).save(account);
 
         assertEquals(3, submittedVersion.get());
         assertEquals(4, account.version());
@@ -161,7 +168,7 @@ class AccountRepositoryAdapterTest {
         account.recordVersion(0);
         prepareSuccessfulWrite();
 
-        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).save(account);
 
         var captor = ArgumentCaptor.forClass(AccountDocument.class);
         verify(mongoRepository).save(captor.capture());
@@ -178,7 +185,7 @@ class AccountRepositoryAdapterTest {
         account.recordVersion(0);
         prepareSuccessfulWrite();
 
-        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).save(account);
 
         var captor = ArgumentCaptor.forClass(AccountDocument.class);
         verify(mongoRepository).save(captor.capture());
@@ -193,7 +200,7 @@ class AccountRepositoryAdapterTest {
         account.recordVersion(0);
         prepareSuccessfulWrite();
 
-        new AccountRepositoryAdapter(mongoRepository, new AccountMapper()).save(account);
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).save(account);
 
         var captor = ArgumentCaptor.forClass(AccountDocument.class);
         verify(mongoRepository).save(captor.capture());
@@ -212,7 +219,7 @@ class AccountRepositoryAdapterTest {
     @Timeout(1)
     @Tag("accountRepositoryAdapter")
     void shouldTranslateOnlyExpectedWriteConflictsWithoutAdvancingVersion() {
-        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper());
+        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate);
         Account account = account();
         account.recordVersion(2);
         for (RuntimeException failure : new RuntimeException[]{new DuplicateKeyException("synthetic duplicate"),
@@ -229,9 +236,29 @@ class AccountRepositoryAdapterTest {
     void shouldNotDisguiseDatabaseOutagesAsBusinessConflicts() {
         var failure = new DataAccessResourceFailureException("synthetic outage");
         when(mongoRepository.save(any(AccountDocument.class))).thenThrow(failure);
-        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper());
+        var adapter = new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate);
 
         assertSame(failure, assertThrows(DataAccessResourceFailureException.class, () -> adapter.save(account())));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountRepositoryAdapter")
+    void shouldRecordLastLoginWithAnAtomicUpdateThatKeepsTheVersion() {
+        Date loginAt = new Date(Instant.parse("2026-03-01T10:00:00Z"));
+        Account account = account(loginAt);
+        account.recordVersion(4);
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<UpdateDefinition> update = ArgumentCaptor.forClass(UpdateDefinition.class);
+
+        new AccountRepositoryAdapter(mongoRepository, new AccountMapper(), mongoTemplate).recordLogin(account);
+
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(AccountDocument.class));
+        assertEquals(new ObjectId(ACCOUNT_ID), query.getValue().getQueryObject().get("_id"));
+        assertEquals(new org.bson.Document("$set", new org.bson.Document("lastLoginAt", "2026-03-01T10:00:00Z")),
+                update.getValue().getUpdateObject());
+        assertEquals(4, account.version());
+        verify(mongoRepository, never()).save(any());
     }
 
     private void prepareSuccessfulWrite() {

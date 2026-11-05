@@ -1,9 +1,20 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   backend:
     image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE}
     restart: unless-stopped
+    mem_limit: ${BACKEND_MEMORY_LIMIT:-768m}
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError
       MONGO_URI: ${MONGO_URI:?Set MONGO_URI}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:?Set APP_FRONTEND_URL}
@@ -20,24 +31,28 @@ services:
 
   caddy:
     container_name: messafy-prod-caddy
-    image: messafy/caddy-ratelimit:2.10.2-v0.1.0
-    build:
-      context: .
-      dockerfile: Dockerfile.caddy
+    image: ${CADDY_IMAGE:?Set CADDY_IMAGE}
     restart: unless-stopped
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    mem_limit: 256m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    logging: *logging
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     environment:
       BACKEND_UPSTREAM: backend:8080
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
     networks: [edge]
 
   tunnel:
     container_name: messafy-prod-tunnel
-    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    image: cloudflare/cloudflared:2026.10.7
     restart: unless-stopped
+    mem_limit: 256m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set the Cloudflare Tunnel token}
@@ -48,7 +63,3 @@ services:
 
 networks:
   edge:
-
-volumes:
-  caddy-data:
-  caddy-config:

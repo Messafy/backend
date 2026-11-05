@@ -49,7 +49,11 @@ public class PinNoteUseCase implements PinNotePort {
             return Result.failure(ApplicationError.conflictError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Set pinned={} on note {}", request.pinned(), note.id().id());
         return Result.success(PinnedNoteResponse.from(note));
     }

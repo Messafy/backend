@@ -20,11 +20,11 @@ public class GetAccountUseCase implements AccountLookup {
 
     private final Logger log;
     private final AccountRepository accountRepository;
-    private final PasswordHasher passwordHasher;
+    private final TimingSafePasswordCheck passwordCheck;
 
     public GetAccountUseCase(AccountRepository accountRepository, PasswordHasher passwordHasher, Logger log) {
         this.accountRepository = accountRepository;
-        this.passwordHasher = passwordHasher;
+        this.passwordCheck = new TimingSafePasswordCheck(passwordHasher);
         this.log = log;
     }
 
@@ -51,26 +51,17 @@ public class GetAccountUseCase implements AccountLookup {
     }
 
     @Override
-    public Optional<UserId> findActiveAccountIdByPublicCode(String publicCode) {
-        if (publicCode == null || publicCode.isBlank()) {
+    public Optional<UserId> findRecipient(String publicCode, String rawLockerPassword) {
+        Optional<Account> recipient = publicCode == null || publicCode.isBlank()
+                ? Optional.empty()
+                : accountRepository.findByPublicCode(publicCode).filter(Account::isActive);
+        EncodedPassword storedHash = recipient
+                .map(account -> new EncodedPassword(account.lockerPassword().value()))
+                .orElse(null);
+        if (!passwordCheck.matches(rawLockerPassword, storedHash)) {
             return Optional.empty();
         }
-        return accountRepository.findByPublicCode(publicCode)
-                .filter(Account::isActive)
-                .map(Account::id);
-    }
-
-    @Override
-    public boolean matchesLockerPassword(UserId accountId, String rawLockerPassword) {
-        if (accountId == null || rawLockerPassword == null || rawLockerPassword.isBlank()) {
-            return false;
-        }
-        return accountRepository.findById(accountId)
-                .map(account -> passwordHasher.matches(
-                        rawLockerPassword,
-                        new EncodedPassword(account.lockerPassword().value())
-                ))
-                .orElse(false);
+        return recipient.map(Account::id);
     }
 
 }

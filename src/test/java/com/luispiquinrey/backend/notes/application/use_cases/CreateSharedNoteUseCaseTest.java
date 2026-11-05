@@ -59,8 +59,7 @@ class CreateSharedNoteUseCaseTest {
     @Timeout(1)
     @Tag("createSharedNoteUseCase")
     void createsSharedNoteForVerifiedRecipient() {
-        when(accountLookup.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(RECIPIENT_ID));
-        when(accountLookup.matchesLockerPassword(RECIPIENT_ID, "CorrectLocker!")).thenReturn(true);
+        when(accountLookup.findRecipient(PUBLIC_CODE, "CorrectLocker!")).thenReturn(Optional.of(RECIPIENT_ID));
         when(idGenerator.nextId()).thenReturn(NOTE_ID);
         var request = new CreateSharedNoteRequest(
                 OWNER_ID, "Hello", "Body", PUBLIC_CODE, "CorrectLocker!", null);
@@ -71,8 +70,7 @@ class CreateSharedNoteUseCaseTest {
         CreatedNoteResponse response = result.getValue();
         assertEquals("SHARED", response.type());
         assertEquals("NEW", response.status());
-        verify(accountLookup).findActiveAccountIdByPublicCode(PUBLIC_CODE);
-        verify(accountLookup).matchesLockerPassword(RECIPIENT_ID, "CorrectLocker!");
+        verify(accountLookup).findRecipient(PUBLIC_CODE, "CorrectLocker!");
         verify(repository).save(any(SharedNote.class));
         verify(realtimeNotifier).notifySharedNote(any(Note.class), eq(RECIPIENT_ID.id()));
     }
@@ -81,7 +79,7 @@ class CreateSharedNoteUseCaseTest {
     @Timeout(1)
     @Tag("createSharedNoteUseCase")
     void rejectsUnknownRecipientWithoutSaving() {
-        when(accountLookup.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
+        when(accountLookup.findRecipient(PUBLIC_CODE, "AnyLocker1!")).thenReturn(Optional.empty());
         var request = new CreateSharedNoteRequest(
                 OWNER_ID, "Hello", "Body", PUBLIC_CODE, "AnyLocker1!", null);
 
@@ -89,8 +87,7 @@ class CreateSharedNoteUseCaseTest {
 
         assertTrue(result.isFailure());
         assertEquals(ErrorType.VALIDATION_ERROR, result.getError().type());
-        assertEquals("no active account was found for the provided public code", result.getError().message());
-        verify(accountLookup, never()).matchesLockerPassword(any(), any());
+        assertEquals(CreateSharedNoteUseCase.INVALID_RECIPIENT, result.getError().message());
         verify(repository, never()).save(any());
         verify(realtimeNotifier, never()).notifySharedNote(any(), any());
     }
@@ -99,8 +96,7 @@ class CreateSharedNoteUseCaseTest {
     @Timeout(1)
     @Tag("createSharedNoteUseCase")
     void rejectsLockerPasswordMismatchWithoutSaving() {
-        when(accountLookup.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(RECIPIENT_ID));
-        when(accountLookup.matchesLockerPassword(RECIPIENT_ID, "WrongLocker!")).thenReturn(false);
+        when(accountLookup.findRecipient(PUBLIC_CODE, "WrongLocker!")).thenReturn(Optional.empty());
         var request = new CreateSharedNoteRequest(
                 OWNER_ID, "Hello", "Body", PUBLIC_CODE, "WrongLocker!", null);
 
@@ -108,7 +104,7 @@ class CreateSharedNoteUseCaseTest {
 
         assertTrue(result.isFailure());
         assertEquals(ErrorType.VALIDATION_ERROR, result.getError().type());
-        assertEquals("locker password does not match the recipient", result.getError().message());
+        assertEquals(CreateSharedNoteUseCase.INVALID_RECIPIENT, result.getError().message());
         verify(repository, never()).save(any());
         verify(realtimeNotifier, never()).notifySharedNote(any(), any());
     }
@@ -127,7 +123,7 @@ class CreateSharedNoteUseCaseTest {
     @Timeout(1)
     @Tag("createSharedNoteUseCase")
     void unknownRecipientIsRejectedByTheAccountLookup() {
-        when(accountLookup.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
+        when(accountLookup.findRecipient(PUBLIC_CODE, LOCKER_PASSWORD)).thenReturn(Optional.empty());
         var request = new CreateSharedNoteRequest(
                 OWNER_ID, "Title", "Body", PUBLIC_CODE, LOCKER_PASSWORD, null);
 

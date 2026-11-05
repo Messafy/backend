@@ -4,12 +4,14 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class HttpResponsePresenterTest {
@@ -25,7 +27,11 @@ class HttpResponsePresenterTest {
         ResponseEntity<?> response = presenter.toHttp(result);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertSame(result.getError(), response.getBody());
+        var problem = assertInstanceOf(ProblemDetail.class, response.getBody());
+        assertEquals(404, problem.getStatus());
+        assertEquals("not found", problem.getDetail());
+        assertEquals("NOT_FOUND_ERROR", problem.getProperties().get("code"));
+        assertEquals("not found", problem.getProperties().get("message"));
     }
 
     @Test

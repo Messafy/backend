@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 class SmtpMailSenderTest {
 
@@ -61,5 +63,47 @@ class SmtpMailSenderTest {
         doThrow(new MailSendException("SMTP unavailable")).when(transport).send(message);
         var sender = new SmtpMailSender(transport, "noreply@example.com", "https://api.example.com", "__LINK__");
         assertThrows(MailDeliveryException.class, () -> sender.sendVerification("user@example.com", "token"));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("smtpMailSender")
+    void retriesTransientFailuresUntilDeliverySucceeds() {
+        JavaMailSender transport = mock(JavaMailSender.class);
+        MimeMessage message = new MimeMessage(jakarta.mail.Session.getInstance(new java.util.Properties()));
+        when(transport.createMimeMessage()).thenReturn(message);
+        doThrow(new MailSendException("SMTP unavailable")).doNothing().when(transport).send(message);
+        var sender = new SmtpMailSender(transport, "noreply@example.com", "https://api.example.com", "__LINK__",
+                3, java.time.Duration.ZERO);
+
+        sender.sendVerification("user@example.com", "token");
+
+        verify(transport, times(2)).send(message);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("smtpMailSender")
+    void givesUpAfterTheLastAttempt() {
+        JavaMailSender transport = mock(JavaMailSender.class);
+        MimeMessage message = new MimeMessage(jakarta.mail.Session.getInstance(new java.util.Properties()));
+        when(transport.createMimeMessage()).thenReturn(message);
+        doThrow(new MailSendException("SMTP unavailable")).when(transport).send(message);
+        var sender = new SmtpMailSender(transport, "noreply@example.com", "https://api.example.com", "__LINK__",
+                3, java.time.Duration.ofMillis(1));
+
+        assertThrows(MailDeliveryException.class, () -> sender.sendVerification("user@example.com", "token"));
+        verify(transport, times(3)).send(message);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("smtpMailSender")
+    void rejectsInvalidRetrySettings() {
+        JavaMailSender transport = mock(JavaMailSender.class);
+        assertThrows(IllegalArgumentException.class, () -> new SmtpMailSender(
+                transport, "noreply@example.com", "https://api.example.com", "__LINK__", 0, java.time.Duration.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> new SmtpMailSender(
+                transport, "noreply@example.com", "https://api.example.com", "__LINK__", 1, java.time.Duration.ofSeconds(-1)));
     }
 }

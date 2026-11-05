@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.account.infrastructure.security;
 
+import com.luispiquinrey.backend.account.domain.exception.AccountVerificationTokenException;
 import com.luispiquinrey.backend.account.domain.model.Account;
 import com.luispiquinrey.backend.account.domain.model.AccountStatus;
 import com.luispiquinrey.backend.account.domain.model.Email;
@@ -8,20 +9,20 @@ import com.luispiquinrey.backend.account.domain.model.LockerPassword;
 import com.luispiquinrey.backend.account.domain.model.PublicCode;
 import com.luispiquinrey.backend.account.domain.model.Role;
 import com.luispiquinrey.backend.share.identity.UserId;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpringJwtTokenVerifierTest {
@@ -29,93 +30,114 @@ class SpringJwtTokenVerifierTest {
     private static final String SECRET = "test-secret-key-with-at-least-thirty-two-characters";
     private static final String OTHER_SECRET = "another-test-key-with-at-least-thirty-two-characters";
     private static final String EMAIL = "user@example.com";
+    private static final String ACCOUNT_ID = "507f1f77bcf86cd799439011";
+
+    private final SpringJwtTokenVerifier verifier = new SpringJwtTokenVerifier(SECRET);
 
     @Test
     @Timeout(1)
     @Tag("springJwtTokenVerifier")
-    void shouldRejectExpiredTokens() {
-        SpringJwtTokenVerifier verifier = new SpringJwtTokenVerifier(SECRET);
-        UserDetails user = User.withUsername(EMAIL).password("password").roles("USER").build();
-        String expiredToken = Jwts.builder()
+    void acceptsAccessTokensIssuedByTheApplication() {
+        String token = new SpringJwtTokenIssuer(SECRET).issue(account());
+
+        assertEquals(Optional.of(EMAIL), verifier.verifyAccessToken(token));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void acceptsLegacyAccessTokensWithoutAPurposeClaim() {
+        String token = signed(SECRET).claim("email", EMAIL).subject(ACCOUNT_ID).compact();
+
+        assertEquals(Optional.of(EMAIL), verifier.verifyAccessToken(token));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void rejectsVerificationTokensUsedAsAccessTokens() {
+        String verification = new SpringJwtVerificationTokenCodec(SECRET).issue(ACCOUNT_ID);
+        String forged = signed(SECRET).claim("typ", "email-verification").claim("email", EMAIL).compact();
+
+        assertTrue(verifier.verifyAccessToken(verification).isEmpty());
+        assertTrue(verifier.verifyAccessToken(forged).isEmpty());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void rejectsAccessTokensUsedAsVerificationTokens() {
+        String access = new SpringJwtTokenIssuer(SECRET).issue(account());
+        SpringJwtVerificationTokenCodec codec = new SpringJwtVerificationTokenCodec(SECRET);
+
+        assertThrows(AccountVerificationTokenException.class, () -> codec.extractAccountId(access));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void acceptsVerificationTokensWithAndWithoutAPurposeClaim() {
+        SpringJwtVerificationTokenCodec codec = new SpringJwtVerificationTokenCodec(SECRET);
+        String legacy = signed(SECRET).subject(ACCOUNT_ID).compact();
+
+        assertEquals(ACCOUNT_ID, codec.extractAccountId(codec.issue(ACCOUNT_ID)));
+        assertEquals(ACCOUNT_ID, codec.extractAccountId(legacy));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("springJwtTokenVerifier")
+    void rejectsExpiredTokens() {
+        String expired = Jwts.builder()
+                .claim("typ", "access")
                 .claim("email", EMAIL)
                 .expiration(new Date(System.currentTimeMillis() - 1_000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
                 .compact();
 
-        assertFalse(verifier.isTokenValid(expiredToken, user));
+        assertTrue(verifier.verifyAccessToken(expired).isEmpty());
     }
 
     @Test
     @Timeout(1)
     @Tag("springJwtTokenVerifier")
-    void shouldValidateTokensIssuedForTheirUser() {
-        Account account = account();
-        String token = new SpringJwtTokenIssuer(SECRET).issue(account);
-        SpringJwtTokenVerifier verifier = new SpringJwtTokenVerifier(SECRET);
+    void rejectsTokensSignedWithAnotherKey() {
+        String token = signed(OTHER_SECRET).claim("typ", "access").claim("email", EMAIL).compact();
 
-        assertEquals(EMAIL, verifier.extractEmail(token));
-        assertTrue(verifier.isTokenValid(token, new AccountUserDetails(account)));
+        assertTrue(verifier.verifyAccessToken(token).isEmpty());
     }
 
     @Test
     @Timeout(1)
     @Tag("springJwtTokenVerifier")
-    void shouldRejectTokensSignedWithAnotherKey() {
-        UserDetails user = User.withUsername(EMAIL).password("password").roles("USER").build();
-        String token = Jwts.builder()
-                .claim("email", EMAIL)
-                .expiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(OTHER_SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
-                .compact();
+    void rejectsTokensWithoutAnEmailClaim() {
+        String token = signed(SECRET).claim("typ", "access").compact();
 
-        assertFalse(new SpringJwtTokenVerifier(SECRET).isTokenValid(token, user));
+        assertTrue(verifier.verifyAccessToken(token).isEmpty());
     }
 
     @Test
     @Timeout(1)
     @Tag("springJwtTokenVerifier")
-    void shouldRejectTokensWithoutAnEmailClaim() {
-        UserDetails user = User.withUsername(EMAIL).password("password").roles("USER").build();
-        String token = Jwts.builder()
-                .expiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
-                .compact();
-
-        assertFalse(new SpringJwtTokenVerifier(SECRET).isTokenValid(token, user));
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("springJwtTokenVerifier")
-    void shouldRejectDisabledLockedExpiredAccountsAndExpiredCredentials() {
-        String token = new SpringJwtTokenIssuer(SECRET).issue(account());
-        var verifier = new SpringJwtTokenVerifier(SECRET);
-        for (UserDetails user : new UserDetails[]{
-                User.withUsername(EMAIL).password("unused").roles("USER").disabled(true).build(),
-                User.withUsername(EMAIL).password("unused").roles("USER").accountLocked(true).build(),
-                User.withUsername(EMAIL).password("unused").roles("USER").accountExpired(true).build(),
-                User.withUsername(EMAIL).password("unused").roles("USER").credentialsExpired(true).build()}) {
-            assertFalse(verifier.isTokenValid(token, user));
-        }
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("springJwtTokenVerifier")
-    void shouldRejectTokensWithoutExpirationAndMalformedTokens() {
-        var verifier = new SpringJwtTokenVerifier(SECRET);
-        UserDetails user = User.withUsername(EMAIL).password("unused").roles("USER").build();
-        String withoutExpiration = Jwts.builder().claim("email", EMAIL)
+    void rejectsTokensWithoutExpirationAndMalformedTokens() {
+        String withoutExpiration = Jwts.builder().claim("typ", "access").claim("email", EMAIL)
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256).compact();
 
-        assertFalse(verifier.isTokenValid(withoutExpiration, user));
-        assertFalse(verifier.isTokenValid("malformed", user));
-        assertFalse(verifier.isTokenValid("", user));
+        assertTrue(verifier.verifyAccessToken(withoutExpiration).isEmpty());
+        assertTrue(verifier.verifyAccessToken("malformed").isEmpty());
+        assertTrue(verifier.verifyAccessToken("").isEmpty());
+        assertTrue(verifier.verifyAccessToken(null).isEmpty());
+    }
+
+    private static JwtBuilder signed(String secret) {
+        return Jwts.builder()
+                .expiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256);
     }
 
     private Account account() {
         return new Account.AccountBuilder()
-                .id(new UserId("507f1f77bcf86cd799439011"))
+                .id(new UserId(ACCOUNT_ID))
                 .email(new Email(EMAIL))
                 .encodedPassword(new EncodedPassword("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"))
                 .publicCode(new PublicCode("V1StGXR8_Z5j"))

@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.application.use_cases;
 
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.account.api.AccountLookup;
 import com.luispiquinrey.backend.notes.application.dto.request.CreateSharedNoteRequest;
 import com.luispiquinrey.backend.notes.application.dto.response.CreatedNoteResponse;
@@ -23,6 +24,8 @@ import java.util.Optional;
 @LogExecution
 @Service
 public class CreateSharedNoteUseCase implements CreateSharedNotePort {
+
+    static final String INVALID_RECIPIENT = "recipient public code or locker password is invalid";
 
     private final Logger log;
     private final NoteRepository repository;
@@ -51,16 +54,12 @@ public class CreateSharedNoteUseCase implements CreateSharedNotePort {
             return Result.failure(ApplicationError.validationError("note creation data cannot be null"));
         }
 
-        Optional<UserId> recipientId = accountLookup.findActiveAccountIdByPublicCode(request.recipientPublicCode());
+        Optional<UserId> recipientId = accountLookup.findRecipient(
+                request.recipientPublicCode(),
+                request.recipientLockerPassword()
+        );
         if (recipientId.isEmpty()) {
-            return Result.failure(ApplicationError.validationError(
-                    "no active account was found for the provided public code"
-            ));
-        }
-        if (!accountLookup.matchesLockerPassword(recipientId.get(), request.recipientLockerPassword())) {
-            return Result.failure(ApplicationError.validationError(
-                    "locker password does not match the recipient"
-            ));
+            return Result.failure(ApplicationError.validationError(INVALID_RECIPIENT));
         }
 
         String noteId = idGenerator.nextId();
@@ -82,7 +81,11 @@ public class CreateSharedNoteUseCase implements CreateSharedNotePort {
             return Result.failure(ApplicationError.validationError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Created shared note {} for recipient {}", note.id().id(), recipientId.get().id());
         realtimeNotifier.notifySharedNote(note, recipientId.get().id());
         return Result.success(CreatedNoteResponse.from(note));

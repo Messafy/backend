@@ -39,7 +39,6 @@ class JwtAuthenticationRegressionTest {
 
         filter.doFilter(request, response, (req, res) -> reached.set(true));
 
-        assertFalse(verifier.isTokenValid(token, details));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         assertEquals(401, response.getStatus());
         assertFalse(reached.get());
@@ -57,6 +56,9 @@ class JwtAuthenticationRegressionTest {
         filter.doFilter(request("malformed"), response, (req, res) -> reached.set(true));
 
         assertEquals(401, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(response.getContentType().startsWith("application/problem+json"));
+        org.junit.jupiter.api.Assertions.assertTrue(
+                response.getContentAsString().contains("\"code\":\"UNAUTHORIZED_ERROR\""));
         assertFalse(reached.get());
     }
 

@@ -153,6 +153,10 @@
             <artifactId>jnanoid</artifactId>
             <version>2.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
 
 
     </dependencies>
@@ -310,10 +314,6 @@
                     </to>
                     <container>
                         <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
-                        <labels>
-                            <!-- Kamal validates this label before deploying Jib images. -->
-                            <service>messafy-backend</service>
-                        </labels>
                     </container>
                 </configuration>
             </plugin>

@@ -1,5 +1,7 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
+import com.luispiquinrey.backend.account.presentation.request.RegisterAccountBody;
+import com.luispiquinrey.backend.account.presentation.request.LoginAccountBody;
 import com.luispiquinrey.backend.account.application.dto.request.GetAccountRequest;
 import com.luispiquinrey.backend.account.application.dto.request.LoginAccountRequest;
 import com.luispiquinrey.backend.account.application.dto.request.RegisterAccountRequest;
@@ -11,7 +13,6 @@ import com.luispiquinrey.backend.account.presentation.presenter.LoginAccountPres
 import com.luispiquinrey.backend.account.presentation.presenter.RegisterAccountPresenter;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.ErrorType;
 import com.luispiquinrey.backend.share.result.Result;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ProblemDetail;
 
 import java.util.Map;
 
@@ -62,7 +64,7 @@ class AccountControllerOperationResultTest {
             when(service.login(new LoginAccountRequest("user@example.com", "password")))
                     .thenReturn(Result.failure(new ApplicationError(type, "Operation failed")));
 
-            assertPublicError(controller.login(Map.of("email", "user@example.com", "rawPassword", "password")), type);
+            assertPublicError(controller.login(new LoginAccountBody("user@example.com", "password")), type);
         }
     }
 
@@ -78,15 +80,14 @@ class AccountControllerOperationResultTest {
             when(service.register(new RegisterAccountRequest("user@example.com", "Password1!", "Locker1!")))
                     .thenReturn(Result.failure(new ApplicationError(type, "Operation failed")));
 
-            assertPublicError(controller.register(Map.of("email", "user@example.com",
-                    "rawPassword", "Password1!", "rawLockerPassword", "Locker1!")), type);
+            assertPublicError(controller.register(new RegisterAccountBody("user@example.com", "Password1!", "Locker1!")), type);
         }
     }
 
     private void assertPublicError(ResponseEntity<?> response, ErrorType type) {
         assertEquals(STATUSES.get(type).intValue(), response.getStatusCode().value());
-        var error = assertInstanceOf(ErrorViewModel.class, response.getBody());
-        assertEquals(type.name(), error.code());
-        assertEquals(type == ErrorType.INTERNAL_ERROR ? "An internal error occurred" : "Operation failed", error.message());
+        var error = assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties();
+        assertEquals(type.name(), error.get("code"));
+        assertEquals(type == ErrorType.INTERNAL_ERROR ? "An internal error occurred" : "Operation failed", error.get("message"));
     }
 }

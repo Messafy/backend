@@ -2,11 +2,11 @@ package com.luispiquinrey.backend.account.infrastructure.config;
 
 import com.luispiquinrey.backend.account.infrastructure.security.JwtAuthenticationFilter;
 import com.luispiquinrey.backend.account.infrastructure.security.JwtTokenVerifier;
+import com.luispiquinrey.backend.account.infrastructure.security.SecurityProblemResponses;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -16,20 +16,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-
-import java.util.List;
 
 @Profile("!test")
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_USER = "USER";
 
     private final String frontendUrl;
 
@@ -60,72 +51,21 @@ public class SecurityConfig {
     ) throws Exception {
 
         return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(ApiSecurityRules.cors(frontendUrl)))
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(SecurityProblemResponses.authenticationEntryPoint())
+                        .accessDeniedHandler(SecurityProblemResponses.accessDeniedHandler()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/actuator/health/readiness")
-                        .permitAll()
-
-                        .requestMatchers("/v1/auth/**")
-                        .permitAll()
-
-                        .requestMatchers("/ws")
-                        .permitAll()
-
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
-                        .permitAll()
-
-                        .requestMatchers("/v1/admin/**")
-                        .hasRole(ROLE_ADMIN)
-
-                        .requestMatchers(HttpMethod.GET, "/v1/accounts/me")
-                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
-
-                        .requestMatchers("/v1/accounts/**")
-                        .hasRole(ROLE_ADMIN)
-
-                        .requestMatchers(HttpMethod.POST, "/v1/notes")
-                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
-
-                        .requestMatchers(HttpMethod.GET, "/v1/notes/**")
-                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
-
-                        .requestMatchers(HttpMethod.PATCH, "/v1/notes/**")
-                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
-
-                        .requestMatchers(HttpMethod.DELETE, "/v1/notes/**")
-                        .hasAnyRole(ROLE_USER, ROLE_ADMIN)
-
-                        .anyRequest()
-                        .authenticated()
-                )
+                .authorizeHttpRequests(ApiSecurityRules::authorize)
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .build();
-    }
-
-    private CorsConfigurationSource corsConfigurationSource() {
-        return request -> {
-            CorsConfiguration corsConfiguration = new CorsConfiguration();
-            corsConfiguration.setAllowedOrigins(
-                    List.of(frontendUrl)
-            );
-            corsConfiguration.setAllowedMethods(
-                    List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS")
-            );
-            corsConfiguration.setAllowedHeaders(
-                    List.of("Content-Type", "Authorization")
-            );
-            corsConfiguration.setAllowCredentials(true);
-            return corsConfiguration;
-        };
     }
 }

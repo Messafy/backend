@@ -2,6 +2,7 @@ package com.luispiquinrey.backend.account.infrastructure.security;
 
 import com.luispiquinrey.backend.account.application.port.VerificationTokenCodec;
 import com.luispiquinrey.backend.account.domain.exception.AccountVerificationTokenException;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
@@ -32,6 +33,7 @@ public class SpringJwtVerificationTokenCodec implements VerificationTokenCodec {
         log.debug("Issuing verification token for account {}", accountId);
         return Jwts.builder()
                 .subject(accountId)
+                .claim(TokenPurpose.CLAIM, TokenPurpose.EMAIL_VERIFICATION.value())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + VERIFICATION_TOKEN_EXPIRATION_MILLIS))
                 .signWith(key, Jwts.SIG.HS256)
@@ -41,12 +43,16 @@ public class SpringJwtVerificationTokenCodec implements VerificationTokenCodec {
     @Override
     public String extractAccountId(String rawToken) {
         try {
-            String accountId = Jwts.parser()
+            Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(rawToken)
-                    .getPayload()
-                    .getSubject();
+                    .getPayload();
+            String accountId = claims.getSubject();
+            if (!TokenPurpose.EMAIL_VERIFICATION.matches(claims) || accountId == null || accountId.isBlank()) {
+                log.debug("Rejected a token that is not an email verification token");
+                throw new AccountVerificationTokenException("verification token is invalid or expired");
+            }
             log.debug("Extracted account {} from verification token", accountId);
             return accountId;
         } catch (JwtException | IllegalArgumentException e) {

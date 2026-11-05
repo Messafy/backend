@@ -69,7 +69,8 @@ class LoginAccountUseCaseTest {
         assertEquals("opaque-login-token", response.getValue().token());
         assertNotNull(account.lastLoginAt());
         assertFalse(account.lastLoginAt().value().isBefore(beforeLogin));
-        verify(repository).save(account);
+        verify(repository).recordLogin(account);
+        verify(repository, never()).save(any());
 
         verify(tokenIssuer).issue(account);
     }
@@ -98,14 +99,18 @@ class LoginAccountUseCaseTest {
     @Tag("loginAccountUseCase")
     void shouldRejectMissingAccount() {
         LoginAccountRequest request = new LoginAccountRequest("user@example.com", "correct-password");
+        EncodedPassword dummy = new EncodedPassword("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
         when(repository.findByEmail("user@example.com")).thenReturn(Optional.empty());
+        when(passwordHasher.hash(any())).thenReturn(dummy);
 
         var result = service.login(request);
         assertTrue(result.isFailure());
         assertEquals(ApplicationError.unauthorizedError("invalid credentials"), result.getError());
 
+        verify(passwordHasher).matches("correct-password", dummy);
         verify(repository, never()).save(any());
-        verifyNoInteractions(passwordHasher, tokenIssuer);
+        verify(repository, never()).recordLogin(any());
+        verifyNoInteractions(tokenIssuer);
     }
 
     @Test
@@ -144,7 +149,7 @@ class LoginAccountUseCaseTest {
     @Test
     @Timeout(1)
     @Tag("loginAccountUseCase")
-    void shouldTranslateDomainConflictWithoutSavingOrIssuingToken() {
+    void shouldAnswerClosedAccountsWithTheGenericCredentialsError() {
         Account account = account();
         account.delete();
         var request = new LoginAccountRequest("user@example.com", "correct-password");
@@ -154,8 +159,9 @@ class LoginAccountUseCaseTest {
         var result = service.login(request);
 
         assertTrue(result.isFailure());
-        assertEquals(com.luispiquinrey.backend.share.result.ErrorType.CONFLICT_ERROR, result.getError().type());
+        assertEquals(ApplicationError.unauthorizedError("invalid credentials"), result.getError());
         verify(repository, never()).save(any());
+        verify(repository, never()).recordLogin(any());
         verifyNoInteractions(tokenIssuer);
     }
 
@@ -175,18 +181,26 @@ class LoginAccountUseCaseTest {
     @Test
     @Timeout(1)
     @Tag("loginAccountUseCase")
-    void shouldTranslateConcurrentSaveConflictWithoutIssuingToken() {
-        Account account = account();
+    void shouldAnswerUnverifiedAccountsWithTheGenericCredentialsError() {
+        Account account = new Account.AccountBuilder()
+                .id(new UserId("507f1f77bcf86cd799439011"))
+                .email(new Email("user@example.com"))
+                .encodedPassword(new EncodedPassword(
+                        "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+                ))
+                .publicCode(new PublicCode("V1StGXR8_Z5j"))
+                .lockerPassword(new LockerPassword(
+                        "$2a$10$7EqJtq98hPqEX7fNZaFWoO5z7c2uR3HF4YDs5H3WwQ1S/9vGQ4r6e"
+                ))
+                .build();
         var request = new LoginAccountRequest("user@example.com", "correct-password");
         when(repository.findByEmail(request.email())).thenReturn(Optional.of(account));
         when(passwordHasher.matches(request.rawPassword(), account.encodedPassword())).thenReturn(true);
-        org.mockito.Mockito.doThrow(new com.luispiquinrey.backend.account.domain.exception.AccountConflictException(
-                "account was modified concurrently; reload and retry")).when(repository).save(account);
 
         var result = service.login(request);
 
-        assertTrue(result.isFailure());
-        assertEquals(ApplicationError.conflictError("account was modified concurrently; reload and retry"), result.getError());
+        assertEquals(ApplicationError.unauthorizedError("invalid credentials"), result.getError());
+        verify(repository, never()).recordLogin(any());
         verifyNoInteractions(tokenIssuer);
     }
 }

@@ -55,7 +55,11 @@ public class UpdateNoteUseCase implements UpdateNotePort {
             return Result.failure(ApplicationError.validationError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Updated note {}", note.id().id());
         return Result.success(UpdatedNoteResponse.from(note));
     }

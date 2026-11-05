@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
+import org.springframework.http.ProblemDetail;
 import com.luispiquinrey.backend.notes.application.dto.response.ReadNoteResponse;
 import com.luispiquinrey.backend.notes.application.port.MarkNoteAsReadPort;
 import com.luispiquinrey.backend.notes.presentation.presenter.MarkNoteAsReadPresenter;
@@ -7,7 +8,6 @@ import com.luispiquinrey.backend.notes.presentation.viewmodel.MarkNoteAsReadView
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
@@ -69,6 +69,6 @@ class MarkNoteAsReadControllerTest {
                 ApplicationError.notFoundError("note not found")));
         var response = controller.markAsRead("note", USER);
         assertEquals(404, response.getStatusCode().value());
-        assertEquals("NOT_FOUND_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("NOT_FOUND_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
     }
 }

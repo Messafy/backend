@@ -48,7 +48,11 @@ public class DeleteNoteUseCase implements DeleteNotePort {
             return Result.failure(ApplicationError.conflictError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Deleted note {}", note.id().id());
         return Result.success(DeletedNoteResponse.from(note));
     }

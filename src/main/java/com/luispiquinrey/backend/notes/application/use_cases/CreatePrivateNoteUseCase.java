@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.application.use_cases;
 
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.application.dto.request.CreatePrivateNoteRequest;
 import com.luispiquinrey.backend.notes.application.dto.response.CreatedNoteResponse;
 import com.luispiquinrey.backend.notes.application.port.CreatePrivateNotePort;
@@ -55,7 +56,11 @@ public class CreatePrivateNoteUseCase implements CreatePrivateNotePort {
             return Result.failure(ApplicationError.validationError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Created private note {}", note.id().id());
         return Result.success(CreatedNoteResponse.from(note));
     }

@@ -6,6 +6,7 @@ import com.luispiquinrey.backend.account.domain.exception.AccountNotFoundExcepti
 import com.luispiquinrey.backend.account.domain.exception.AccountPasswordMismatchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.luispiquinrey.backend.share.presentation.Problems;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -20,7 +21,7 @@ public class AccountExceptionHandler {
     @ExceptionHandler(AccountConflictException.class)
     public ProblemDetail handleAccountConflict(AccountConflictException ex) {
         log.warn("Request failed because the account state does not allow the operation: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        return Problems.of(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(AccountPasswordMismatchException.class)
@@ -35,18 +36,18 @@ public class AccountExceptionHandler {
 
     private ProblemDetail invalidCredentials(RuntimeException ex) {
         log.warn("Request failed because credentials were invalid: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "invalid credentials");
+        return Problems.of(HttpStatus.UNAUTHORIZED, "invalid credentials");
     }
 
     @ExceptionHandler(AccountNotFoundException.class)
     public ProblemDetail handleAccountNotFoundById(AccountNotFoundException ex) {
         log.warn("Request failed because the account was not found: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        return Problems.of(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(UsernameNotFoundException.class)
     public ProblemDetail handleAccountNotFound(UsernameNotFoundException ex) {
         log.warn("Request failed because the account was not found: {}", ex.getMessage());
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "invalid credentials");
+        return Problems.of(HttpStatus.UNAUTHORIZED, "invalid credentials");
     }
 }

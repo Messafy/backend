@@ -2,18 +2,17 @@ package com.luispiquinrey.backend.notes.application.use_cases;
 
 import com.luispiquinrey.backend.notes.application.dto.request.GetNoteRequest;
 import com.luispiquinrey.backend.notes.application.dto.request.ListNotesRequest;
+import com.luispiquinrey.backend.notes.application.dto.response.NotePageResponse;
 import com.luispiquinrey.backend.notes.application.dto.response.NoteResponse;
 import com.luispiquinrey.backend.notes.application.port.GetNotePort;
-import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
+import com.luispiquinrey.backend.notes.domain.repository.NotePage;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
 import com.luispiquinrey.backend.share.logging.LogExecution;
 import com.luispiquinrey.backend.share.logging.Logger;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @LogExecution
 @Service
@@ -43,64 +42,56 @@ public class GetNoteUseCase implements GetNotePort {
     }
 
     @Override
-    public Result<List<NoteResponse>> findByStatus(ListNotesRequest request) {
+    public Result<NotePageResponse> findByStatus(ListNotesRequest request) {
         if (request == null || request.status() == null) {
             return Result.failure(ApplicationError.validationError("note status cannot be null"));
         }
-
-        log.debug("Loading notes with status {}", request.status());
-        List<NoteResponse> notes = repository.findByStatus(request.status().name()).stream()
-                .filter(note -> note.canAccess(request.requesterId()))
-                .map(NoteResponse::from)
-                .toList();
-        return Result.success(notes);
+        log.debug("Loading notes with status {} for account {}", request.status(), request.requesterId());
+        return page(repository.findAccessibleByStatus(request.requesterId(), request.status(), request.page()));
     }
 
     @Override
-    public Result<List<NoteResponse>> findActiveByOwner(ListNotesRequest request) {
+    public Result<NotePageResponse> findActiveByOwner(ListNotesRequest request) {
         if (request == null) {
             return Result.failure(ApplicationError.validationError("note lookup data cannot be null"));
         }
-
         log.debug("Loading active notes for account {}", request.requesterId());
-        return Result.success(responses(repository.findActiveByOwner(request.requesterId())));
+        return page(repository.findActiveByOwner(request.requesterId(), request.page()));
     }
 
     @Override
-    public Result<List<NoteResponse>> findActiveBySharedWith(ListNotesRequest request) {
+    public Result<NotePageResponse> findActiveBySharedWith(ListNotesRequest request) {
         if (request == null) {
             return Result.failure(ApplicationError.validationError("note lookup data cannot be null"));
         }
-
         log.debug("Loading active notes shared with {}", request.requesterId());
-        return Result.success(responses(repository.findActiveBySharedWith(request.requesterId())));
+        return page(repository.findActiveBySharedWith(request.requesterId(), request.page()));
     }
 
     @Override
-    public Result<List<NoteResponse>> findActiveByOwnerAndSharedWith(ListNotesRequest request) {
+    public Result<NotePageResponse> findActiveByOwnerAndSharedWith(ListNotesRequest request) {
         if (request == null || request.sharedWith() == null) {
             return Result.failure(ApplicationError.validationError("shared-with account id cannot be null"));
         }
-
         log.debug("Loading active notes for owner {} shared with {}",
                 request.requesterId(), request.sharedWith());
-        return Result.success(responses(repository.findActiveByOwnerAndSharedWith(
+        return page(repository.findActiveByOwnerAndSharedWith(
                 request.requesterId(),
-                request.sharedWith()
-        )));
+                request.sharedWith(),
+                request.page()
+        ));
     }
 
     @Override
-    public Result<List<NoteResponse>> findDeletedByOwner(ListNotesRequest request) {
+    public Result<NotePageResponse> findDeletedByOwner(ListNotesRequest request) {
         if (request == null) {
             return Result.failure(ApplicationError.validationError("note lookup data cannot be null"));
         }
-
         log.debug("Loading deleted notes for owner {}", request.requesterId());
-        return Result.success(responses(repository.findDeletedByOwner(request.requesterId())));
+        return page(repository.findDeletedByOwner(request.requesterId(), request.page()));
     }
 
-    private List<NoteResponse> responses(List<Note> notes) {
-        return notes.stream().map(NoteResponse::from).toList();
+    private Result<NotePageResponse> page(NotePage page) {
+        return Result.success(NotePageResponse.from(page));
     }
 }

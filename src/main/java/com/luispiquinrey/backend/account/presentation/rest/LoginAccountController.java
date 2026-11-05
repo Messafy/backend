@@ -4,6 +4,7 @@ import com.luispiquinrey.backend.account.application.use_cases.LoginAccountUseCa
 import com.luispiquinrey.backend.account.application.dto.request.LoginAccountRequest;
 import com.luispiquinrey.backend.account.presentation.viewmodel.LoginViewModel;
 import com.luispiquinrey.backend.account.presentation.presenter.LoginAccountPresenter;
+import com.luispiquinrey.backend.account.presentation.request.LoginAccountBody;
 import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import com.luispiquinrey.backend.share.result.ApplicationError;
@@ -21,8 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -53,7 +52,7 @@ public class LoginAccountController {
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = LoginAccountRequest.class))))
+                            schema = @Schema(implementation = LoginAccountBody.class))))
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -69,15 +68,18 @@ public class LoginAccountController {
                             schema = @Schema(implementation = ErrorViewModel.class))),
             @ApiResponse(
                     responseCode = "401",
-                    description = "Invalid credentials (unknown email or password mismatch)",
-                    content = @Content(mediaType = "application/json"))})
+                    description = "Invalid credentials. Unknown email, wrong password, unverified and "
+                            + "closed accounts all get this same answer",
+                    content = @Content(
+                            mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ErrorViewModel.class)))})
     @PostMapping("/login")
     public ResponseEntity<?> login(
-            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+            @org.springframework.web.bind.annotation.RequestBody LoginAccountBody body) {
         log.info("Received login attempt");
         LoginAccountRequest input;
         try {
-            input = new LoginAccountRequest(body.get("email"), body.get("rawPassword"));
+            input = new LoginAccountRequest(body.email(), body.rawPassword());
         } catch (IllegalArgumentException e) {
             return httpResponsePresenter.toHttp(
                     presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))));

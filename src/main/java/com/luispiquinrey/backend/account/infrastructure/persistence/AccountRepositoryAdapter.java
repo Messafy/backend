@@ -8,6 +8,10 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -19,10 +23,16 @@ public class AccountRepositoryAdapter implements AccountRepository {
 
     private final MongoDataAccountRepository mongoDataAccountRepository;
     private final AccountMapper accountMapper;
+    private final MongoTemplate mongoTemplate;
 
-    public AccountRepositoryAdapter(MongoDataAccountRepository mongoDataAccountRepository, AccountMapper accountMapper) {
+    public AccountRepositoryAdapter(
+            MongoDataAccountRepository mongoDataAccountRepository,
+            AccountMapper accountMapper,
+            MongoTemplate mongoTemplate
+    ) {
         this.mongoDataAccountRepository = mongoDataAccountRepository;
         this.accountMapper = accountMapper;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Override
@@ -64,5 +74,18 @@ public class AccountRepositoryAdapter implements AccountRepository {
             throw new AccountConflictException("account was modified concurrently; reload and retry");
         }
         log.debug("MongoDB persisted account {}", account.id().id());
+    }
+
+    @Override
+    public void recordLogin(Account account) {
+        if (account.lastLoginAt() == null) {
+            return;
+        }
+        log.debug("Recording last login for account {} in MongoDB", account.id().id());
+        mongoTemplate.updateFirst(
+                Query.query(Criteria.where("_id").is(accountMapper.toObjectId(account.id().id()))),
+                Update.update("lastLoginAt", account.lastLoginAt().value().toString()),
+                AccountDocument.class
+        );
     }
 }

@@ -4,22 +4,38 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: backend-production
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: Verify
+    if: github.repository == 'Messafy/backend' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   deployment:
-    name: Build and deploy
+    name: Publish and deploy
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: DEV_ENVIRONMENT
+
+    permissions:
+      contents: read
+      packages: write
 
     env:
       VPS_HOST: ${{ vars.VPS_HOST }}
@@ -28,13 +44,9 @@ jobs:
       VPS_ENV_FILE: ${{ vars.VPS_ENV_FILE || '/home/ubuntu/messafy/backend/.env.prod' }}
       VPS_DEPLOY_DIR: ${{ vars.VPS_DEPLOY_DIR || '/home/ubuntu/messafy/backend/deploy' }}
 
-    if: github.ref == 'refs/heads/main'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
 
       - name: Set up Java 21
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -43,29 +55,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Cache SonarQube packages
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: |
-            ${{ runner.os }}-sonar
-
       - name: Make Maven Wrapper executable
         run: chmod +x mvnw
 
-      - name: Build, test and analyze
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: >
-          ./mvnw --batch-mode clean verify
-          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
-          -Dsonar.organization=messafy
-          -Dsonar.projectKey=Messafy_backend
-          -Dsonar.qualitygate.wait=true
-
-      - name: Set image name
-        run: echo "BACKEND_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+      - name: Set image names
+        run: |
+          image_base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          caddy_tag="$(sha256sum deploy/Dockerfile.caddy | cut -c1-12)"
+          echo "BACKEND_IMAGE=${image_base}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "CADDY_IMAGE=${image_base}-caddy:${caddy_tag}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -74,9 +72,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish commit image with Jib
+      - name: Publish Caddy image
+        run: |
+          if docker manifest inspect "$CADDY_IMAGE" > /dev/null 2>&1; then
+            echo "Caddy image $CADDY_IMAGE already exists"
+          else
+            docker buildx build --push \
+              --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+              --tag "$CADDY_IMAGE" \
+              --file deploy/Dockerfile.caddy deploy
+          fi
+
+      - name: Publish backend image with Jib
         run: >
-          ./mvnw --batch-mode jib:build
+          ./mvnw --batch-mode -DskipTests compile jib:build
           -Djib.to.image="${BACKEND_IMAGE}"
 
       - name: Deploy with Docker Compose over SSH
@@ -98,6 +107,7 @@ jobs:
           [[ "$VPS_ENV_FILE" =~ ^/[a-zA-Z0-9_./-]+$ ]]
           [[ "$VPS_DEPLOY_DIR" =~ ^/[a-zA-Z0-9_./-]+$ ]]
           [[ "$BACKEND_IMAGE" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[0-9a-f]{40}$ ]]
+          [[ "$CADDY_IMAGE" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+-caddy:[0-9a-f]{12}$ ]]
 
           install -m 700 -d "$HOME/.ssh"
           umask 077
@@ -115,13 +125,12 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
           target="$VPS_USER@$VPS_HOST"
 
-          ssh "${ssh_options[@]}" "$target" "mkdir -p $VPS_DEPLOY_DIR"
+          ssh "${ssh_options[@]}" "$target" "mkdir -p $VPS_DEPLOY_DIR && cd $VPS_DEPLOY_DIR && for f in docker-compose.prod.yml Caddyfile; do if [ -f \$f ]; then cp -p \$f \$f.previous; fi; done"
           scp -P "$VPS_PORT" -i "$HOME/.ssh/deploy_key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            src/main/resources/docker-compose.prod.yml \
-            src/main/resources/Caddyfile \
-            src/main/resources/Dockerfile.caddy \
+            deploy/docker-compose.prod.yml \
+            deploy/Caddyfile \
             "$target:$VPS_DEPLOY_DIR/"
 
           {
@@ -137,11 +146,92 @@ jobs:
           printf '%s' "$GHCR_TOKEN" |
             docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
           compose=(docker compose -p messafy-prod --env-file "$VPS_ENV_FILE" -f "$VPS_DEPLOY_DIR/docker-compose.prod.yml")
-          "${compose[@]}" pull backend tunnel
-          "${compose[@]}" up -d --build --remove-orphans
+
+          image_of() {
+            local container
+            container="$("${compose[@]}" ps -q "$1" 2>/dev/null || true)"
+            if [[ -n "$container" ]]; then
+              docker inspect --format '{{.Config.Image}}' "$container"
+            fi
+          }
+
+          backend_ready() {
+            "${compose[@]}" exec -T caddy \
+              wget -q -O /dev/null -T 3 http://backend:8080/actuator/health/readiness
+          }
+
+          wait_until_ready() {
+            for attempt in $(seq 1 36); do
+              if backend_ready; then
+                echo "Backend ready after $attempt checks"
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          reload_caddy() {
+            for attempt in $(seq 1 10); do
+              if "${compose[@]}" exec -T caddy \
+                caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null; then
+                return 0
+              fi
+              sleep 2
+            done
+            "${compose[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+          }
+
+          rollback() {
+            for file in docker-compose.prod.yml Caddyfile; do
+              if [[ -f "$VPS_DEPLOY_DIR/$file.previous" ]]; then
+                cp -p "$VPS_DEPLOY_DIR/$file.previous" "$VPS_DEPLOY_DIR/$file"
+              fi
+            done
+            if [[ -z "$previous_image" ]]; then
+              echo "No previous backend image to roll back to" >&2
+              return 1
+            fi
+            echo "Rolling back to $previous_image" >&2
+            BACKEND_IMAGE="$previous_image" CADDY_IMAGE="${previous_caddy_image:-$CADDY_IMAGE}" \
+              "${compose[@]}" up -d --remove-orphans
+            reload_caddy || true
+            if wait_until_ready; then
+              echo "Rollback to $previous_image is serving traffic" >&2
+            else
+              echo "Rollback to $previous_image did not become ready" >&2
+            fi
+          }
+
+          previous_image="$(image_of backend)"
+          previous_caddy_image="$(image_of caddy)"
+          echo "Previous backend image: ${previous_image:-none}"
+          echo "Previous Caddy image: ${previous_caddy_image:-none}"
+
+          "${compose[@]}" pull backend caddy tunnel
+          "${compose[@]}" up -d --remove-orphans
+
+          if ! reload_caddy; then
+            echo "Caddy could not load the new Caddyfile" >&2
+            "${compose[@]}" logs --tail 50 caddy >&2 || true
+            rollback || true
+            exit 1
+          fi
+
+          if wait_until_ready; then
+            docker image prune -af --filter "until=168h" > /dev/null
+            exit 0
+          fi
+
+          echo "Backend did not become ready in 3 minutes" >&2
+          "${compose[@]}" logs --tail 100 backend >&2 || true
+          if [[ "$previous_image" != "$BACKEND_IMAGE" ]]; then
+            rollback || true
+          fi
+          exit 1
           REMOTE_SCRIPT
           } | ssh "${ssh_options[@]}" "$target" \
-            "read -r GHCR_TOKEN; export GHCR_TOKEN; export GHCR_USERNAME='$GHCR_USERNAME' VPS_ENV_FILE='$VPS_ENV_FILE' VPS_DEPLOY_DIR='$VPS_DEPLOY_DIR' BACKEND_IMAGE='$BACKEND_IMAGE'; bash -s"
+            "read -r GHCR_TOKEN; export GHCR_TOKEN; export GHCR_USERNAME='$GHCR_USERNAME' VPS_ENV_FILE='$VPS_ENV_FILE' VPS_DEPLOY_DIR='$VPS_DEPLOY_DIR' BACKEND_IMAGE='$BACKEND_IMAGE' CADDY_IMAGE='$CADDY_IMAGE'; bash -s"
 
       - name: Remove SSH credentials
         if: always()

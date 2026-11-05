@@ -50,7 +50,11 @@ public class MarkNoteAsReadUseCase implements MarkNoteAsReadPort {
             return Result.failure(ApplicationError.conflictError(e.getMessage()));
         }
 
-        repository.save(note);
+        try {
+            repository.save(note);
+        } catch (NoteConflictException e) {
+            return Result.failure(ApplicationError.conflictError(e.getMessage()));
+        }
         log.debug("Marked note {} as read", note.id().id());
         return Result.success(ReadNoteResponse.from(note));
     }

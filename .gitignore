@@ -35,6 +35,9 @@ build/
 *.key
 *.p12
 secrets/
-/.kamal/secrets
-/.kamal/secrets.*
 /src/main/resources/bruno/
+
+# AI agent instructions (local only)
+CLAUDE.md
+.claude/
+AGENTS.md

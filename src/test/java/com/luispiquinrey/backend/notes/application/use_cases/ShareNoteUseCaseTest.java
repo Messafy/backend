@@ -120,7 +120,7 @@ class ShareNoteUseCaseTest {
     void rejectsUnknownRecipientWithoutSaving() {
         when(repository.findById(new com.luispiquinrey.backend.notes.domain.model.NoteId(NOTE_ID)))
                 .thenReturn(Optional.of(new NoteFactory().createPrivateNote(NOTE_ID, "Title", "Body", OWNER_ID)));
-        when(accounts.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
+        when(accounts.findRecipient(PUBLIC_CODE, LOCKER_PASSWORD)).thenReturn(Optional.empty());
 
         var result = useCase.share(request());
 
@@ -136,14 +136,13 @@ class ShareNoteUseCaseTest {
     void rejectsLockerPasswordMismatchWithoutSaving() {
         when(repository.findById(new com.luispiquinrey.backend.notes.domain.model.NoteId(NOTE_ID)))
                 .thenReturn(Optional.of(new NoteFactory().createPrivateNote(NOTE_ID, "Title", "Body", OWNER_ID)));
-        when(accounts.findActiveAccountIdByPublicCode(PUBLIC_CODE))
-                .thenReturn(Optional.of(new UserId("recipient")));
-        when(accounts.matchesLockerPassword(new UserId("recipient"), LOCKER_PASSWORD)).thenReturn(false);
+        when(accounts.findRecipient(PUBLIC_CODE, LOCKER_PASSWORD)).thenReturn(Optional.empty());
 
         var result = useCase.share(request());
 
         assertTrue(result.isFailure());
         assertEquals(ErrorType.VALIDATION_ERROR, result.getError().type());
+        assertEquals(ShareNoteUseCase.INVALID_RECIPIENT, result.getError().message());
         verify(repository, never()).save(any());
         verifyNoInteractions(notifier);
     }
@@ -164,6 +163,34 @@ class ShareNoteUseCaseTest {
         assertEquals(ErrorType.VALIDATION_ERROR, nullRequest.getError().type());
     }
 
+    @Test
+    @Timeout(1)
+    @Tag("shareNoteUseCase")
+    void sharedRepresentationKeepsTheVersionOfThePrivateNote() {
+        Note original = prepareNote();
+        original.recordVersion(5);
+        var saved = org.mockito.ArgumentCaptor.forClass(Note.class);
+
+        assertTrue(useCase.share(request()).isSuccess());
+
+        verify(repository).save(saved.capture());
+        assertEquals(5, saved.getValue().version());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("shareNoteUseCase")
+    void concurrentModificationIsReportedAsConflictWithoutNotifying() {
+        prepareNote();
+        org.mockito.Mockito.doThrow(new com.luispiquinrey.backend.notes.domain.exception.NoteConflictException("stale"))
+                .when(repository).save(any());
+
+        var result = useCase.share(request());
+
+        assertEquals(ErrorType.CONFLICT_ERROR, result.getError().type());
+        verifyNoInteractions(notifier);
+    }
+
     private ShareNoteRequest request() {
         return new ShareNoteRequest(NOTE_ID, OWNER_ID, PUBLIC_CODE, LOCKER_PASSWORD);
     }
@@ -171,8 +198,7 @@ class ShareNoteUseCaseTest {
     private Note prepareNote() {
         Note original = new NoteFactory().createPrivateNote(NOTE_ID, "Title", "Body", OWNER_ID);
         when(repository.findById(original.id())).thenReturn(Optional.of(original));
-        when(accounts.findActiveAccountIdByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(new UserId("recipient")));
-        when(accounts.matchesLockerPassword(new UserId("recipient"), LOCKER_PASSWORD)).thenReturn(true);
+        when(accounts.findRecipient(PUBLIC_CODE, LOCKER_PASSWORD)).thenReturn(Optional.of(new UserId("recipient")));
         return original;
     }
 }

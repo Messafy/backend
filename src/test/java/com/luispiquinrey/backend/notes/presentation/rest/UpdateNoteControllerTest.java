@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
+import org.springframework.http.ProblemDetail;
 import com.luispiquinrey.backend.notes.application.dto.response.UpdatedNoteResponse;
 import com.luispiquinrey.backend.notes.application.port.UpdateNotePort;
 import com.luispiquinrey.backend.notes.presentation.presenter.UpdateNotePresenter;
@@ -7,7 +8,6 @@ import com.luispiquinrey.backend.notes.presentation.viewmodel.UpdateNoteViewMode
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
@@ -55,7 +55,7 @@ class UpdateNoteControllerTest {
         var response = controller.update("note", Map.of("title", " ", "content", "Content"), USER);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("VALIDATION_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("VALIDATION_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
         verify(useCase, never()).update(any());
     }
 

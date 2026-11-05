@@ -32,7 +32,8 @@ public class SpringJwtTokenIssuer implements TokenIssuer {
 
         return Jwts.builder()
                 .subject(account.id().id())
-                .claim("email", account.email().email())
+                .claim(TokenPurpose.CLAIM, TokenPurpose.ACCESS.value())
+                .claim(TokenPurpose.EMAIL_CLAIM, account.email().email())
                 .claim("role", account.role().name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + TOKEN_EXPIRATION_MILLIS))

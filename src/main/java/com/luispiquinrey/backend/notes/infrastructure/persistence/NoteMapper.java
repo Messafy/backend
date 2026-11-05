@@ -30,12 +30,12 @@ public class NoteMapper {
 
         if (document instanceof PrivateNoteDocument privateDocument) {
             log.debug("Mapping private note document {} to domain", document.getId());
-            return toPrivateNoteDomain(privateDocument);
+            return withVersion(toPrivateNoteDomain(privateDocument), document);
         }
 
         if (document instanceof SharedNoteDocument sharedDocument) {
             log.debug("Mapping shared note document {} to domain", document.getId());
-            return toSharedNoteDomain(sharedDocument);
+            return withVersion(toSharedNoteDomain(sharedDocument), document);
         }
 
         throw new IllegalStateException("unsupported note document type: " + document.getClass());
@@ -46,15 +46,27 @@ public class NoteMapper {
 
         if (note instanceof PrivateNote privateNote) {
             log.debug("Mapping private note {} to MongoDB document", note.id().id());
-            return toPrivateDocument(privateNote);
+            return withVersion(toPrivateDocument(privateNote), note);
         }
 
         if (note instanceof SharedNote sharedNote) {
             log.debug("Mapping shared note {} to MongoDB document", note.id().id());
-            return toSharedDocument(sharedNote);
+            return withVersion(toSharedDocument(sharedNote), note);
         }
 
         throw new IllegalStateException("unsupported note type: " + note.getClass());
+    }
+
+    private static Note withVersion(Note note, NoteDocument document) {
+        if (document.getVersion() != null) {
+            note.recordVersion(document.getVersion());
+        }
+        return note;
+    }
+
+    private static NoteDocument withVersion(NoteDocument document, Note note) {
+        document.setVersion(note.version());
+        return document;
     }
 
     public ObjectId toObjectId(String id) {

@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
+import org.springframework.http.ProblemDetail;
 import com.luispiquinrey.backend.notes.application.dto.response.CreatedNoteResponse;
 import com.luispiquinrey.backend.notes.application.port.CreateSharedNotePort;
 import com.luispiquinrey.backend.notes.presentation.presenter.CreateSharedNotePresenter;
@@ -7,7 +8,6 @@ import com.luispiquinrey.backend.notes.presentation.viewmodel.CreateSharedNoteVi
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
@@ -62,7 +62,7 @@ class CreateSharedNoteControllerTest {
                 "recipientLockerPassword", "Locker1!"), USER);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("VALIDATION_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("VALIDATION_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
         verify(useCase, never()).create(any());
     }
 

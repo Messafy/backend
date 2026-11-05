@@ -1,6 +1,8 @@
 package com.luispiquinrey.backend.notes.presentation.presenter;
 
+import com.luispiquinrey.backend.notes.application.dto.response.NotePageResponse;
 import com.luispiquinrey.backend.notes.application.dto.response.NoteResponse;
+import com.luispiquinrey.backend.notes.presentation.viewmodel.NotePageViewModel;
 import com.luispiquinrey.backend.notes.presentation.viewmodel.NoteViewModel;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.OperationResult;
@@ -27,12 +29,28 @@ public class GetNotePresenter {
         return OperationResult.succeed(toView(result.getValue()));
     }
 
-    public OperationResult<List<NoteViewModel>> presentAll(Result<List<NoteResponse>> result) {
+    public OperationResult<List<NoteViewModel>> presentAll(Result<NotePageResponse> result) {
         if (result.isFailure()) {
             var error = result.getError();
             return OperationResult.fail(errorPresenter.present(error.message(), error.type().name()));
         }
-        return OperationResult.succeed(result.getValue().stream().map(this::toView).toList());
+        return OperationResult.succeed(result.getValue().items().stream().map(this::toView).toList());
+    }
+
+    public OperationResult<NotePageViewModel> presentPage(Result<NotePageResponse> result) {
+        if (result.isFailure()) {
+            var error = result.getError();
+            return OperationResult.fail(errorPresenter.present(error.message(), error.type().name()));
+        }
+        NotePageResponse page = result.getValue();
+        int totalPages = page.size() == 0 ? 0 : (int) Math.ceil((double) page.totalItems() / page.size());
+        return OperationResult.succeed(new NotePageViewModel(
+                page.items().stream().map(this::toView).toList(),
+                page.page(),
+                page.size(),
+                page.totalItems(),
+                totalPages
+        ));
     }
 
     private NoteViewModel toView(NoteResponse response) {

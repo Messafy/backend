@@ -6,7 +6,9 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
+import com.luispiquinrey.backend.notes.domain.repository.NotePage;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import com.luispiquinrey.backend.notes.domain.repository.PageQuery;
 import com.luispiquinrey.backend.share.logging.Logger;
 import com.luispiquinrey.backend.share.result.ErrorType;
 import org.junit.jupiter.api.Tag;
@@ -99,16 +101,17 @@ class GetNoteUseCaseTest {
     @Test
     @Timeout(1)
     @Tag("getNoteUseCase")
-    void filtersStatusResultsByAccess() {
+    void delegatesStatusQueriesForTheRequesterToTheRepository() {
         Note note = new NoteFactory().createPrivateNote(NOTE_ID, "Private", "Body", OWNER_ID);
-        when(repository.findByStatus("NEW")).thenReturn(List.of(note));
+        PageQuery page = new PageQuery(0, 20);
+        when(repository.findAccessibleByStatus(OWNER_ID, NoteStatus.NEW, page))
+                .thenReturn(new NotePage(List.of(note), page, 1));
 
-        var stranger = useCase.findByStatus(new ListNotesRequest("stranger", NoteStatus.NEW, null));
-        var owner = useCase.findByStatus(new ListNotesRequest(OWNER_ID, NoteStatus.NEW, null));
+        var owner = useCase.findByStatus(new ListNotesRequest(OWNER_ID, NoteStatus.NEW, null, page));
 
-        assertTrue(stranger.isSuccess());
-        assertTrue(stranger.getValue().isEmpty());
-        assertEquals(1, owner.getValue().size());
+        assertEquals(1, owner.getValue().items().size());
+        assertEquals(1, owner.getValue().totalItems());
+        assertEquals(20, owner.getValue().size());
     }
 
     @Test
@@ -119,23 +122,20 @@ class GetNoteUseCaseTest {
         Note shared = new NoteFactory().createSharedNote("note-shared", "Shared", "Body", OWNER_ID, RECIPIENT_ID);
         Note deleted = new NoteFactory().createPrivateNote("note-deleted", "Deleted", "Body", OWNER_ID);
         deleted.delete();
-        when(repository.findActiveByOwner(OWNER_ID)).thenReturn(List.of(owned));
-        when(repository.findActiveBySharedWith(RECIPIENT_ID)).thenReturn(List.of(shared));
-        when(repository.findActiveByOwnerAndSharedWith(OWNER_ID, RECIPIENT_ID)).thenReturn(List.of(shared));
-        when(repository.findDeletedByOwner(OWNER_ID)).thenReturn(List.of(deleted));
+        PageQuery all = PageQuery.unpaged();
+        when(repository.findActiveByOwner(OWNER_ID, all)).thenReturn(new NotePage(List.of(owned), all, 1));
+        when(repository.findActiveBySharedWith(RECIPIENT_ID, all)).thenReturn(new NotePage(List.of(shared), all, 1));
+        when(repository.findActiveByOwnerAndSharedWith(OWNER_ID, RECIPIENT_ID, all))
+                .thenReturn(new NotePage(List.of(shared), all, 1));
+        when(repository.findDeletedByOwner(OWNER_ID, all)).thenReturn(new NotePage(List.of(deleted), all, 1));
 
-        assertEquals(1, useCase.findActiveByOwner(new ListNotesRequest(OWNER_ID, null, null)).getValue().size());
-        assertEquals(1, useCase.findActiveBySharedWith(new ListNotesRequest(RECIPIENT_ID, null, null)).getValue().size());
+        assertEquals(1, useCase.findActiveByOwner(new ListNotesRequest(OWNER_ID, null, null)).getValue().items().size());
+        assertEquals(1, useCase.findActiveBySharedWith(new ListNotesRequest(RECIPIENT_ID, null, null)).getValue().items().size());
         var combined = useCase.findActiveByOwnerAndSharedWith(
                 new ListNotesRequest(OWNER_ID, null, RECIPIENT_ID));
-        assertEquals(1, combined.getValue().size());
-        assertEquals("SHARED", combined.getValue().getFirst().type());
-        assertEquals(1, useCase.findDeletedByOwner(new ListNotesRequest(OWNER_ID, null, null)).getValue().size());
-
-        verify(repository).findActiveByOwner(OWNER_ID);
-        verify(repository).findActiveBySharedWith(RECIPIENT_ID);
-        verify(repository).findActiveByOwnerAndSharedWith(OWNER_ID, RECIPIENT_ID);
-        verify(repository).findDeletedByOwner(OWNER_ID);
+        assertEquals(1, combined.getValue().items().size());
+        assertEquals("SHARED", combined.getValue().items().getFirst().type());
+        assertEquals(1, useCase.findDeletedByOwner(new ListNotesRequest(OWNER_ID, null, null)).getValue().items().size());
     }
 
     @Test

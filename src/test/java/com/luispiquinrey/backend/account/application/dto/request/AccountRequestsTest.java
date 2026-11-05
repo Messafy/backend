@@ -50,7 +50,17 @@ class AccountRequestsTest {
     @Timeout(1)
     void acceptsRegistrationPasswordLengthBoundaries() {
         assertDoesNotThrow(() -> new RegisterAccountRequest("user@example.com", "Passwo1!", "Locker1!"));
-        assertDoesNotThrow(() -> new RegisterAccountRequest("user@example.com", "a".repeat(126) + "1!", "a".repeat(64)));
+        assertDoesNotThrow(() -> new RegisterAccountRequest("user@example.com", "a".repeat(70) + "1!", "a".repeat(64)));
+    }
+
+    @Test
+    @Tag("accountRequests")
+    @Timeout(1)
+    void rejectsRegistrationPasswordsLongerThanSeventyTwoBytes() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegisterAccountRequest("user@example.com", "a".repeat(71) + "1!", "Locker1!"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegisterAccountRequest("user@example.com", "é".repeat(36) + "1!", "Locker1!"));
     }
 
     @Test

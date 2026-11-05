@@ -2,9 +2,9 @@ package com.luispiquinrey.backend.notes.domain.repository;
 
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
+import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
 import org.jmolecules.ddd.annotation.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -14,13 +14,13 @@ public interface NoteRepository {
 
     void save(Note note);
 
-    List<Note> findByStatus(String status);
+    NotePage findAccessibleByStatus(String accountId, NoteStatus status, PageQuery page);
 
-    List<Note> findActiveByOwner(String ownerId);
+    NotePage findActiveByOwner(String ownerId, PageQuery page);
 
-    List<Note> findActiveBySharedWith(String sharedWith);
+    NotePage findActiveBySharedWith(String sharedWith, PageQuery page);
 
-    List<Note> findActiveByOwnerAndSharedWith(String ownerId, String sharedWith);
+    NotePage findActiveByOwnerAndSharedWith(String ownerId, String sharedWith, PageQuery page);
 
-    List<Note> findDeletedByOwner(String ownerId);
+    NotePage findDeletedByOwner(String ownerId, PageQuery page);
 }

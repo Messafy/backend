@@ -102,6 +102,7 @@ class ArchitectureTests {
                         "..share.presentation..", "..account.presentation.viewmodel..", "..notes.presentation.viewmodel..")
                 .and().doNotHaveSimpleName("ErrorPresenter")
                 .and().doNotHaveSimpleName("HttpResponsePresenter")
+                .and().doNotHaveSimpleName("Problems")
                 .and().doNotHaveSimpleName("package-info")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
                         "java..", "..share.presentation..",
@@ -117,6 +118,7 @@ class ArchitectureTests {
         classes().that().resideInAPackage("..share.presentation..")
                 .and().doNotHaveSimpleName("ErrorPresenter")
                 .and().doNotHaveSimpleName("HttpResponsePresenter")
+                .and().doNotHaveSimpleName("Problems")
                 .and().doNotHaveSimpleName("package-info")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
                         "java..", "..share.presentation..", "org.springframework.stereotype..")
@@ -127,7 +129,7 @@ class ArchitectureTests {
     @Timeout(5)
     @Tag("architecture")
     void sharedHttpResponsePresenterOnlyUsesPresentationAndSpringHttp() {
-        classes().that().haveSimpleName("HttpResponsePresenter")
+        classes().that().haveSimpleName("HttpResponsePresenter").or().haveSimpleName("Problems")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
                         "java..", "..share.presentation..", "org.springframework.http..",
                         "org.springframework.stereotype..")

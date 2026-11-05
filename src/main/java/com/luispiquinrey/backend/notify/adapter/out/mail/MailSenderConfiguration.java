@@ -11,6 +11,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 @Configuration
 public class MailSenderConfiguration {
@@ -20,9 +21,11 @@ public class MailSenderConfiguration {
     @ConditionalOnProperty("spring.mail.host")
     MailSender smtpMailSender(JavaMailSender javaMailSender,
                               @Value("${spring.mail.from:${spring.mail.username}}") String from,
-                              @Value("${app.public-base-url}") String publicBaseUrl) throws IOException {
+                              @Value("${app.public-base-url}") String publicBaseUrl,
+                              @Value("${app.mail.max-attempts:3}") int maxAttempts,
+                              @Value("${app.mail.initial-backoff:PT2S}") Duration initialBackoff) throws IOException {
         String template = new ClassPathResource("mail/verification.html")
                 .getContentAsString(StandardCharsets.UTF_8);
-        return new SmtpMailSender(javaMailSender, from, publicBaseUrl, template);
+        return new SmtpMailSender(javaMailSender, from, publicBaseUrl, template, maxAttempts, initialBackoff);
     }
 }

@@ -1,18 +1,23 @@
 package com.luispiquinrey.backend.notes.infrastructure.persistence;
 
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
+import com.luispiquinrey.backend.notes.domain.repository.NotePage;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
-import org.bson.types.ObjectId;
+import com.luispiquinrey.backend.notes.domain.repository.PageQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -20,21 +25,27 @@ public class NoteRepositoryAdapter implements NoteRepository {
 
     private static final Logger log = LoggerFactory.getLogger(NoteRepositoryAdapter.class);
 
+    static final String COLLECTION = "notes";
+    private static final String TYPE_KEY = "_class";
+    private static final String SHARED_TYPE = "shared";
+    private static final Sort LISTING_ORDER = Sort.by(
+            Sort.Order.desc("pinned"),
+            Sort.Order.desc("createdAt"),
+            Sort.Order.desc("_id")
+    );
+
     private final NoteMapper mapper;
     private final MongoDataNoteRepository baseRepository;
-    private final MongoDataPrivateNoteRepository privateRepository;
-    private final MongoDataSharedNoteRepository sharedRepository;
+    private final MongoTemplate mongoTemplate;
 
     public NoteRepositoryAdapter(
             NoteMapper mapper,
             MongoDataNoteRepository baseRepository,
-            MongoDataPrivateNoteRepository privateRepository,
-            MongoDataSharedNoteRepository sharedRepository
+            MongoTemplate mongoTemplate
     ) {
         this.mapper = mapper;
         this.baseRepository = baseRepository;
-        this.privateRepository = privateRepository;
-        this.sharedRepository = sharedRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Override
@@ -49,79 +60,80 @@ public class NoteRepositoryAdapter implements NoteRepository {
     @Override
     public void save(Note note) {
         log.debug("Persisting note {} in MongoDB", note.id().id());
-        NoteDocument document = mapper.toDocument(note);
-        baseRepository.findById(document.getId())
-                .ifPresent(existing -> document.setVersion(existing.getVersion()));
-        baseRepository.save(document);
+        try {
+            NoteDocument saved = baseRepository.save(mapper.toDocument(note));
+            note.recordVersion(saved.getVersion());
+        } catch (DuplicateKeyException exception) {
+            throw new NoteConflictException("note already exists");
+        } catch (OptimisticLockingFailureException exception) {
+            throw new NoteConflictException("note was modified concurrently; reload and retry");
+        }
         log.debug("MongoDB persisted note {}", note.id().id());
     }
 
     @Override
-    public List<Note> findByStatus(String status) {
-        log.debug("Querying MongoDB for notes with status {}", status);
-        List<Note> notes = baseRepository.findAllByStatus(status)
-                .stream()
+    public NotePage findAccessibleByStatus(String accountId, NoteStatus status, PageQuery page) {
+        return find(new Criteria().andOperator(
+                Criteria.where("status").is(status.name()),
+                ownedOrReceivedBy(accountId)
+        ), page);
+    }
+
+    @Override
+    public NotePage findActiveByOwner(String ownerId, PageQuery page) {
+        return find(new Criteria().andOperator(visible(), ownedOrReceivedBy(ownerId)), page);
+    }
+
+    @Override
+    public NotePage findActiveBySharedWith(String sharedWith, PageQuery page) {
+        return find(new Criteria().andOperator(visible(), receivedBy(sharedWith)), page);
+    }
+
+    @Override
+    public NotePage findActiveByOwnerAndSharedWith(String ownerId, String sharedWith, PageQuery page) {
+        return find(new Criteria().andOperator(
+                visible(),
+                Criteria.where("ownerId").is(ownerId),
+                receivedBy(sharedWith)
+        ), page);
+    }
+
+    @Override
+    public NotePage findDeletedByOwner(String ownerId, PageQuery page) {
+        return find(new Criteria().andOperator(
+                Criteria.where("status").is(NoteStatus.DELETED.name()),
+                Criteria.where("ownerId").is(ownerId)
+        ), page);
+    }
+
+    private NotePage find(Criteria criteria, PageQuery page) {
+        Query query = new Query(criteria).with(LISTING_ORDER);
+        if (page.isPaged()) {
+            query.skip(page.offset()).limit(page.size());
+        }
+        log.debug("Querying MongoDB for notes: {}", query.getQueryObject());
+        List<Note> notes = mongoTemplate.find(query, NoteDocument.class, COLLECTION).stream()
                 .map(mapper::toDomain)
                 .toList();
-        log.debug("MongoDB returned {} notes with status {}", notes.size(), status);
-        return notes;
+        long total = page.isPaged() && (page.offset() > 0 || notes.size() == page.size())
+                ? mongoTemplate.count(new Query(criteria), COLLECTION)
+                : page.offset() + notes.size();
+        log.debug("MongoDB returned {} of {} notes", notes.size(), total);
+        return new NotePage(notes, page, total);
     }
 
-    @Override
-    public List<Note> findActiveByOwner(String ownerId) {
-        log.debug("Querying MongoDB for active notes owned by or shared with {}", ownerId);
-        List<String> visibleStatuses = visibleStatuses();
-        List<NoteDocument> documents = new ArrayList<>();
-        documents.addAll(privateRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
-        documents.addAll(sharedRepository.findAllByOwnerIdAndStatusIn(ownerId, visibleStatuses));
-        documents.addAll(sharedRepository.findAllByStatusInAndSharedWith(visibleStatuses, ownerId));
-        List<Note> notes = dedupeById(documents).stream().map(mapper::toDomain).toList();
-        log.debug("MongoDB returned {} active notes for owner {}", notes.size(), ownerId);
-        return notes;
+    private static Criteria ownedOrReceivedBy(String accountId) {
+        return new Criteria().orOperator(
+                Criteria.where("ownerId").is(accountId),
+                receivedBy(accountId)
+        );
     }
 
-    @Override
-    public List<Note> findActiveBySharedWith(String sharedWith) {
-        log.debug("Querying MongoDB for active notes shared with {}", sharedWith);
-        List<Note> notes = sharedRepository.findAllByStatusInAndSharedWith(visibleStatuses(), sharedWith)
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-        log.debug("MongoDB returned {} active notes shared with {}", notes.size(), sharedWith);
-        return notes;
+    private static Criteria receivedBy(String accountId) {
+        return Criteria.where(TYPE_KEY).is(SHARED_TYPE).and("sharedWith").is(accountId);
     }
 
-    @Override
-    public List<Note> findActiveByOwnerAndSharedWith(String ownerId, String sharedWith) {
-        log.debug("Querying MongoDB for active notes owned by {} and shared with {}", ownerId, sharedWith);
-        List<Note> notes = sharedRepository.findAllByStatusInAndOwnerIdAndSharedWith(
-                visibleStatuses(),
-                ownerId,
-                sharedWith
-        ).stream().map(mapper::toDomain).toList();
-        log.debug("MongoDB returned {} active notes owned by {} and shared with {}", notes.size(), ownerId, sharedWith);
-        return notes;
-    }
-
-    @Override
-    public List<Note> findDeletedByOwner(String ownerId) {
-        List<NoteDocument> documents = new ArrayList<>();
-        documents.addAll(privateRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
-        documents.addAll(sharedRepository.findAllByOwnerIdAndStatus(ownerId, NoteStatus.DELETED.name()));
-        return toDomainList(documents);
-    }
-
-    private List<NoteDocument> dedupeById(List<NoteDocument> documents) {
-        Map<ObjectId, NoteDocument> unique = new LinkedHashMap<>();
-        documents.forEach(document -> unique.putIfAbsent(document.getId(), document));
-        return new ArrayList<>(unique.values());
-    }
-
-    private List<Note> toDomainList(List<NoteDocument> documents) {
-        return documents.stream().map(mapper::toDomain).toList();
-    }
-
-    private List<String> visibleStatuses() {
-        return NoteStatus.visibleStatuses().stream().map(Enum::name).toList();
+    private static Criteria visible() {
+        return Criteria.where("status").in(NoteStatus.visibleStatuses().stream().map(Enum::name).toList());
     }
 }

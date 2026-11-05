@@ -3,10 +3,12 @@ package com.luispiquinrey.backend.notes.infrastructure.persistence;
 import java.util.List;
 
 import org.springframework.data.annotation.TypeAlias;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "notes")
 @TypeAlias("private")
+@CompoundIndex(name = NoteIndexes.OWNER_STATUS, def = NoteIndexes.OWNER_STATUS_KEYS)
 public class PrivateNoteDocument extends NoteDocument {
 
     private String ownerId;

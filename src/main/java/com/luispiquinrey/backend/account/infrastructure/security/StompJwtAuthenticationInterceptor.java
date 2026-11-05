@@ -16,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.messaging.simp.SimpMessageType;
-import io.jsonwebtoken.JwtException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
@@ -68,15 +67,12 @@ public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
     private void authenticate(StompHeaderAccessor accessor) {
         try {
             String token = extractToken(accessor.getFirstNativeHeader(AUTHORIZATION_HEADER));
-            String email = jwtTokenVerifier.extractEmail(token);
-            if (email == null || email.isBlank()) {
-                throw new BadCredentialsException("invalid bearer token");
-            }
+            String email = jwtTokenVerifier.verifyAccessToken(token)
+                    .orElseThrow(() -> new BadCredentialsException("invalid bearer token"));
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
             new AccountStatusUserDetailsChecker().check(userDetails);
 
-            if (!jwtTokenVerifier.isTokenValid(token, userDetails)
-                    || !(userDetails instanceof AuthenticatedUser authenticatedUser)) {
+            if (!(userDetails instanceof AuthenticatedUser authenticatedUser)) {
                 throw new MessagingException("invalid WebSocket authentication");
             }
 
@@ -87,7 +83,7 @@ public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
             }
             accessor.setUser(authentication);
             log.debug("Authenticated WebSocket user {}", authenticatedUser.accountId());
-        } catch (JwtException | IllegalArgumentException | AuthenticationException exception) {
+        } catch (IllegalArgumentException | AuthenticationException exception) {
             log.debug("WebSocket authentication failed");
             throw new MessagingException("invalid WebSocket authentication");
         }

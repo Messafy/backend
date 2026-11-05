@@ -142,66 +142,59 @@ class GetAccountUseCaseTest {
 
     @Test
     @Timeout(1)
-    @Tag("accountLookupPublicCode")
-    void shouldFindActiveAccountIdByPublicCode() {
+    @Tag("accountLookupRecipient")
+    void shouldFindRecipientWhenPublicCodeAndLockerPasswordMatch() {
         when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(account()));
-
-        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
-
-        assertTrue(result.isPresent());
-        assertEquals(ACCOUNT_ID, result.get().id());
-        verify(repository).findByPublicCode(PUBLIC_CODE);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("accountLookupPublicCode")
-    void shouldRejectMissingAccountByPublicCode() {
-        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
-
-        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
-
-        assertFalse(result.isPresent());
-        verify(repository).findByPublicCode(PUBLIC_CODE);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("accountLookupPublicCode")
-    void shouldRejectDeletedAccountByPublicCode() {
-        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(deletedAccount()));
-
-        Optional<UserId> result = service.findActiveAccountIdByPublicCode(PUBLIC_CODE);
-
-        assertFalse(result.isPresent());
-        verify(repository).findByPublicCode(PUBLIC_CODE);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("matchesLockerPassword")
-    void shouldMatchLockerPassword() {
-        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.of(account()));
         when(passwordHasher.matches("raw-locker-password", new EncodedPassword(ENCODED_LOCKER)))
                 .thenReturn(true);
 
-        boolean matches = service.matchesLockerPassword(new UserId(ACCOUNT_ID), "raw-locker-password");
+        Optional<UserId> result = service.findRecipient(PUBLIC_CODE, "raw-locker-password");
 
-        assertTrue(matches);
-        verify(repository).findById(new UserId(ACCOUNT_ID));
-        verify(passwordHasher).matches("raw-locker-password", new EncodedPassword(ENCODED_LOCKER));
+        assertEquals(Optional.of(new UserId(ACCOUNT_ID)), result);
     }
 
     @Test
     @Timeout(1)
-    @Tag("matchesLockerPassword")
-    void shouldNotMatchLockerPasswordForMissingAccount() {
-        when(repository.findById(new UserId(ACCOUNT_ID))).thenReturn(Optional.empty());
+    @Tag("accountLookupRecipient")
+    void shouldRejectRecipientWhenLockerPasswordDoesNotMatch() {
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(account()));
+        when(passwordHasher.matches("wrong-locker-password", new EncodedPassword(ENCODED_LOCKER)))
+                .thenReturn(false);
 
-        boolean matches = service.matchesLockerPassword(new UserId(ACCOUNT_ID), "raw-locker-password");
+        assertTrue(service.findRecipient(PUBLIC_CODE, "wrong-locker-password").isEmpty());
+    }
 
-        assertFalse(matches);
-        verify(repository).findById(new UserId(ACCOUNT_ID));
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupRecipient")
+    void shouldStillCompareAHashWhenPublicCodeIsUnknown() {
+        EncodedPassword dummy = new EncodedPassword(ENCODED_PASSWORD);
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.empty());
+        when(passwordHasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn(dummy);
+
+        assertTrue(service.findRecipient(PUBLIC_CODE, "raw-locker-password").isEmpty());
+        verify(passwordHasher).matches("raw-locker-password", dummy);
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupRecipient")
+    void shouldRejectDeletedRecipientEvenWithTheRightLockerPassword() {
+        EncodedPassword dummy = new EncodedPassword(ENCODED_PASSWORD);
+        when(repository.findByPublicCode(PUBLIC_CODE)).thenReturn(Optional.of(deletedAccount()));
+        when(passwordHasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn(dummy);
+
+        assertTrue(service.findRecipient(PUBLIC_CODE, "raw-locker-password").isEmpty());
+        verify(passwordHasher, org.mockito.Mockito.never())
+                .matches("raw-locker-password", new EncodedPassword(ENCODED_LOCKER));
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("accountLookupRecipient")
+    void shouldRejectBlankPublicCodeWithoutQueryingAccounts() {
+        assertTrue(service.findRecipient(" ", "raw-locker-password").isEmpty());
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findByPublicCode(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.SharedNote;
 import com.luispiquinrey.backend.notes.domain.repository.NoteRepository;
+import com.luispiquinrey.backend.notes.domain.repository.PageQuery;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ class NoteRepositoryAdapterIntegrationTest {
             Note shared = factory.restoreSharedNote(id, "Title", "Body", original.status(), original.createdAt(),
                     null, null, null, "507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013",
                     original.tags(), false);
+            shared.recordVersion(original.version());
             repository.save(shared);
 
             SharedNote loaded = assertInstanceOf(SharedNote.class, repository.findById(original.id()).orElseThrow());
@@ -52,10 +54,11 @@ class NoteRepositoryAdapterIntegrationTest {
 
             loaded.markAsRead();
             repository.save(loaded);
-            assertTrue(repository.findActiveBySharedWith("507f1f77bcf86cd799439013")
-                    .stream().anyMatch(note -> note.id().equals(original.id())));
-            assertTrue(repository.findActiveByOwnerAndSharedWith("507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013")
-                    .stream().anyMatch(note -> note.id().equals(original.id())));
+            assertTrue(repository.findActiveBySharedWith("507f1f77bcf86cd799439013", PageQuery.unpaged())
+                    .items().stream().anyMatch(note -> note.id().equals(original.id())));
+            assertTrue(repository.findActiveByOwnerAndSharedWith("507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013",
+                            PageQuery.unpaged())
+                    .items().stream().anyMatch(note -> note.id().equals(original.id())));
         } finally {
             mongo.remove(query, "notes");
         }

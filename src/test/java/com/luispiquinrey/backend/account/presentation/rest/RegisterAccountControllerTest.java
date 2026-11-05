@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
+import com.luispiquinrey.backend.account.presentation.request.RegisterAccountBody;
 import com.luispiquinrey.backend.account.application.dto.response.AccountResponse;
 import com.luispiquinrey.backend.account.application.dto.request.RegisterAccountRequest;
 import com.luispiquinrey.backend.account.application.use_cases.RegisterAccountUseCase;
@@ -13,13 +14,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.HttpStatus;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
-import java.util.Map;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -122,13 +122,13 @@ class RegisterAccountControllerTest {
     @Tag("registerAccountController")
     void shouldPresentApplicationRequestValidationWithoutInvokingUseCase() {
         RegisterAccountUseCase service = mock(RegisterAccountUseCase.class);
-        var request = Map.of("email", "invalid", "rawPassword", "Password1!", "rawLockerPassword", "Locker1!");
+        var request = new RegisterAccountBody("invalid", "Password1!", "Locker1!");
 
         var response = new RegisterAccountController(
                 service, new RegisterAccountPresenter(new ErrorPresenter()), new HttpResponsePresenter()).register(request);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("email must be a valid email address", assertInstanceOf(ErrorViewModel.class, response.getBody()).message());
+        assertEquals("email must be a valid email address", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("message"));
         verifyNoInteractions(service);
     }
 

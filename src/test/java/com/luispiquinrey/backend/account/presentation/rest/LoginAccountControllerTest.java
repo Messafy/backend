@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.account.presentation.rest;
 
+import com.luispiquinrey.backend.account.presentation.request.LoginAccountBody;
 import com.luispiquinrey.backend.account.application.dto.request.LoginAccountRequest;
 import com.luispiquinrey.backend.account.application.dto.response.LoginAccountResponse;
 import com.luispiquinrey.backend.account.application.use_cases.LoginAccountUseCase;
@@ -22,8 +23,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,7 +43,7 @@ class LoginAccountControllerTest {
     @Tag("loginAccountController")
     void shouldNotLogUntrustedEmail(CapturedOutput output) {
         LoginAccountUseCase service = mock(LoginAccountUseCase.class);
-        var request = Map.of("email", "user@example.com\r\nFORGED_LOGIN", "rawPassword", "password");
+        var request = new LoginAccountBody("user@example.com\r\nFORGED_LOGIN", "password");
 
         var response = new LoginAccountController(
                 service, new LoginAccountPresenter(new ErrorPresenter()), new HttpResponsePresenter()).login(request);
@@ -114,7 +113,7 @@ class LoginAccountControllerTest {
     @Tag("loginAccountController")
     void shouldNotMisclassifyUnexpectedUseCaseExceptionsAsInputValidation() {
         LoginAccountUseCase service = mock(LoginAccountUseCase.class);
-        var request = Map.of("email", "user@example.com", "rawPassword", "password");
+        var request = new LoginAccountBody("user@example.com", "password");
         when(service.login(new LoginAccountRequest("user@example.com", "password")))
                 .thenThrow(new IllegalArgumentException("invalid stored data"));
 
@@ -137,7 +136,7 @@ class LoginAccountControllerTest {
         when(presenter.present(result)).thenReturn(OperationResult.succeed(view));
 
         var response = new LoginAccountController(service, presenter, new HttpResponsePresenter())
-                .login(Map.of("email", "user@example.com", "rawPassword", "password"));
+                .login(new LoginAccountBody("user@example.com", "password"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(view, response.getBody());

@@ -1,5 +1,10 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
+import com.luispiquinrey.backend.notes.application.dto.request.ListNotesRequest;
+import com.luispiquinrey.backend.notes.application.dto.response.NotePageResponse;
+import com.luispiquinrey.backend.notes.domain.repository.PageQuery;
+import com.luispiquinrey.backend.notes.presentation.viewmodel.NotePageViewModel;
+import org.springframework.http.ProblemDetail;
 import com.luispiquinrey.backend.notes.application.dto.response.NoteResponse;
 import com.luispiquinrey.backend.notes.application.port.GetNotePort;
 import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
@@ -8,7 +13,6 @@ import com.luispiquinrey.backend.notes.presentation.viewmodel.NoteViewModel;
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
@@ -57,7 +61,7 @@ class GetNoteControllerTest {
         var response = controller.getById("note", USER);
 
         assertEquals(404, response.getStatusCode().value());
-        assertEquals("NOT_FOUND_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("NOT_FOUND_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
     }
 
     @Test
@@ -74,7 +78,7 @@ class GetNoteControllerTest {
     @Timeout(1)
     @Tag("getNoteController")
     void listsByStatusAndMapsToViewModels() {
-        when(useCase.findByStatus(any())).thenReturn(Result.success(List.of(noteResponse())));
+        when(useCase.findByStatus(any())).thenReturn(Result.success(new NotePageResponse(List.of(noteResponse()), 0, 1, 1)));
 
         var response = controller.getByStatus(NoteStatus.NEW, USER);
 
@@ -91,6 +95,56 @@ class GetNoteControllerTest {
 
         assertEquals(400, response.getStatusCode().value());
         verify(useCase, never()).findActiveByOwner(any());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("getNoteController")
+    void listsMyNotesAsAPageWithDefaults() {
+        var request = org.mockito.ArgumentCaptor.forClass(ListNotesRequest.class);
+        when(useCase.findActiveByOwner(request.capture()))
+                .thenReturn(Result.success(new NotePageResponse(List.of(noteResponse()), 0, 20, 21)));
+
+        var response = controller.getMine(null, null, null, USER);
+
+        assertEquals(200, response.getStatusCode().value());
+        var page = assertInstanceOf(NotePageViewModel.class, response.getBody());
+        assertEquals(1, page.items().size());
+        assertEquals(21, page.totalItems());
+        assertEquals(2, page.totalPages());
+        assertEquals(new PageQuery(0, 20), request.getValue().page());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("getNoteController")
+    void filtersMyNotesByStatusWhenRequested() {
+        when(useCase.findByStatus(any())).thenReturn(Result.success(new NotePageResponse(List.of(), 1, 5, 5)));
+
+        var response = controller.getMine(NoteStatus.READ, 1, 5, USER);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(useCase, never()).findActiveByOwner(any());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("getNoteController")
+    void rejectsOutOfRangePageSizeBeforeCallingUseCase() {
+        var response = controller.getInbox(0, PageQuery.MAX_SIZE + 1, USER);
+
+        assertEquals(400, response.getStatusCode().value());
+        verify(useCase, never()).findActiveBySharedWith(any());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("getNoteController")
+    void rejectsNegativePageBeforeCallingUseCase() {
+        var response = controller.getDeleted(-1, 10, USER);
+
+        assertEquals(400, response.getStatusCode().value());
+        verify(useCase, never()).findDeletedByOwner(any());
     }
 
     private NoteResponse noteResponse() {

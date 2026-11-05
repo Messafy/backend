@@ -121,8 +121,8 @@ class ProfileConfigurationTest {
         assertNull(env.getProperty("management.opentelemetry.logging.export.otlp.endpoint"));
         assertNull(env.getProperty("management.otlp.metrics.export.url"));
 
-        // Container environment now comes from the VPS .env.prod through Kamal;
-        // Compose manages only Caddy and Tunnel. Keep testing Spring's contract here.
+        // Container environment now comes from the VPS .env.prod through Docker Compose;
+        // keep testing Spring's contract here.
         assertNull(env.getProperty("management.opentelemetry.resource-attributes.service.name"));
     }
 

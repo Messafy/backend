@@ -1,24 +1,36 @@
 package com.luispiquinrey.backend.notes.infrastructure.persistence;
 
+import com.luispiquinrey.backend.notes.domain.exception.NoteConflictException;
 import com.luispiquinrey.backend.notes.domain.model.Note;
 import com.luispiquinrey.backend.notes.domain.model.NoteFactory;
 import com.luispiquinrey.backend.notes.domain.model.NoteId;
+import com.luispiquinrey.backend.notes.domain.model.NoteStatus;
+import com.luispiquinrey.backend.notes.domain.repository.NotePage;
+import com.luispiquinrey.backend.notes.domain.repository.PageQuery;
+import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,445 +38,186 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class NoteRepositoryAdapterTest {
 
-    @Mock
-    private NoteMapper mapper;
+    private static final String NOTE_ID = "507f1f77bcf86cd799439011";
+    private static final String OWNER_ID = "507f1f77bcf86cd799439012";
+    private static final String RECIPIENT_ID = "507f1f77bcf86cd799439013";
 
     @Mock
     private MongoDataNoteRepository baseRepository;
 
     @Mock
-    private MongoDataPrivateNoteRepository privateRepository;
+    private MongoTemplate mongoTemplate;
 
-    @Mock
-    private MongoDataSharedNoteRepository sharedRepository;
-
-    @InjectMocks
+    private final NoteMapper mapper = new NoteMapper();
     private NoteRepositoryAdapter repository;
 
+    @BeforeEach
+    void setUp() {
+        repository = new NoteRepositoryAdapter(mapper, baseRepository, mongoTemplate);
+    }
+
     @Test
     @Timeout(1)
-    @Tag("mongoCreateNoteRepository")
-    void shouldMapAndPersistNote() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-        PrivateNoteDocument document = new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "NEW",
-                note.createdAt().value().toString(),
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-
-        when(mapper.toDocument(note)).thenReturn(document);
+    @Tag("mongoSaveNoteRepository")
+    void savesNewNoteWithoutVersionAndRecordsTheStoredVersion() {
+        Note note = privateNote();
+        when(baseRepository.save(any(NoteDocument.class))).thenAnswer(invocation -> {
+            NoteDocument document = invocation.getArgument(0);
+            assertNull(document.getVersion());
+            document.setVersion(0);
+            return document;
+        });
 
         repository.save(note);
 
-        verify(mapper).toDocument(note);
-        verify(baseRepository).save(document);
+        assertEquals(0, note.version());
     }
 
     @Test
     @Timeout(1)
-    @Tag("mongoCreateNoteRepository")
-    void shouldMapAndPersistSharedNote() {
-        Note note = new NoteFactory().createSharedNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
-        SharedNoteDocument document = new SharedNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "NEW",
-                note.createdAt().value().toString(),
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
-
-        when(mapper.toDocument(note)).thenReturn(document);
+    @Tag("mongoSaveNoteRepository")
+    void savesTheVersionTheNoteWasLoadedWithInsteadOfReloadingIt() {
+        Note note = privateNote();
+        note.recordVersion(3);
+        note.markAsRead();
+        ArgumentCaptor<NoteDocument> saved = ArgumentCaptor.forClass(NoteDocument.class);
+        when(baseRepository.save(saved.capture())).thenAnswer(invocation -> {
+            NoteDocument document = invocation.getArgument(0);
+            document.setVersion(4);
+            return document;
+        });
 
         repository.save(note);
 
-        verify(mapper).toDocument(note);
-        verify(baseRepository).save(document);
+        assertEquals("READ", saved.getValue().getStatus());
+        assertEquals(note.readAt().value().toString(), saved.getValue().getReadAt());
+        assertEquals(4, note.version());
+        verify(baseRepository, never()).findById(any());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("mongoSaveNoteRepository")
+    void translatesConcurrentModificationIntoNoteConflict() {
+        Note note = privateNote();
+        note.recordVersion(1);
+        when(baseRepository.save(any(NoteDocument.class)))
+                .thenThrow(new OptimisticLockingFailureException("stale"));
+
+        assertThrows(NoteConflictException.class, () -> repository.save(note));
+        assertEquals(1, note.version());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("mongoSaveNoteRepository")
+    void translatesDuplicateIdIntoNoteConflict() {
+        when(baseRepository.save(any(NoteDocument.class))).thenThrow(new DuplicateKeyException("duplicate"));
+
+        assertThrows(NoteConflictException.class, () -> repository.save(privateNote()));
     }
 
     @Test
     @Timeout(1)
     @Tag("mongoGetNoteRepository")
-    void shouldReturnNoteWhenDocumentExists() {
-        PrivateNoteDocument document = privateDocument();
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-        Note expectedNote = privateNote("507f1f77bcf86cd799439011");
+    void findsNoteByIdWithItsVersion() {
+        PrivateNoteDocument document = (PrivateNoteDocument) mapper.toDocument(privateNote());
+        document.setVersion(2);
+        when(baseRepository.findById(new ObjectId(NOTE_ID))).thenReturn(Optional.of(document));
 
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.of(document));
-        when(mapper.toDomain(document)).thenReturn(expectedNote);
+        Note found = repository.findById(new NoteId(NOTE_ID)).orElseThrow();
 
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isPresent());
-        assertEquals(expectedNote, result.get());
-        verify(mapper).toObjectId("507f1f77bcf86cd799439011");
-        verify(baseRepository).findById(objectId);
-        verify(mapper).toDomain(document);
+        assertEquals(NOTE_ID, found.id().id());
+        assertEquals(2, found.version());
     }
 
     @Test
     @Timeout(1)
     @Tag("mongoGetNoteRepository")
-    void shouldReturnEmptyWhenDocumentDoesNotExist() {
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
+    void returnsEmptyWhenTheNoteDoesNotExist() {
+        when(baseRepository.findById(new ObjectId(NOTE_ID))).thenReturn(Optional.empty());
 
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.empty());
-
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isEmpty());
-        verify(mapper, never()).toDomain(any());
+        assertTrue(repository.findById(new NoteId(NOTE_ID)).isEmpty());
     }
 
     @Test
     @Timeout(1)
-    @Tag("mongoGetNoteRepository")
-    void shouldFindAllNotesByStatus() {
-        PrivateNoteDocument firstDocument = privateDocument();
-        SharedNoteDocument secondDocument = sharedDocument();
-        Note firstNote = privateNote("507f1f77bcf86cd799439011");
-        Note secondNote = sharedNote();
+    @Tag("mongoListNoteRepository")
+    void filtersByStatusAndRequesterInTheDatabase() {
+        Query query = captureListing(() -> repository.findAccessibleByStatus(OWNER_ID, NoteStatus.READ, PageQuery.unpaged()));
 
-        when(baseRepository.findAllByStatus("READ")).thenReturn(List.of(firstDocument, secondDocument));
-        when(mapper.toDomain(firstDocument)).thenReturn(firstNote);
-        when(mapper.toDomain(secondDocument)).thenReturn(secondNote);
-
-        List<Note> result = repository.findByStatus("READ");
-
-        assertEquals(List.of(firstNote, secondNote), result);
-        verify(baseRepository).findAllByStatus("READ");
+        Document filter = query.getQueryObject();
+        String json = filter.toJson();
+        assertTrue(json.contains("\"status\": \"READ\""), json);
+        assertTrue(json.contains("\"ownerId\": \"" + OWNER_ID + "\""), json);
+        assertTrue(json.contains("\"sharedWith\": \"" + OWNER_ID + "\""), json);
+        assertEquals(0, query.getSkip());
+        assertEquals(0, query.getLimit());
     }
 
     @Test
     @Timeout(1)
-    @Tag("mongoGetNoteRepository")
-    void shouldFindActiveNotesOwnedByOrSharedWithOwner() {
-        PrivateNoteDocument privateDocument = privateDocument();
-        SharedNoteDocument sharedDocument = sharedDocument();
-        Note privateNote = privateNote("507f1f77bcf86cd799439011");
-        Note sharedNote = sharedNote();
+    @Tag("mongoListNoteRepository")
+    void restrictsReceivedNotesToSharedDocuments() {
+        Query query = captureListing(() -> repository.findActiveBySharedWith(RECIPIENT_ID, PageQuery.unpaged()));
 
-        List<String> visibleStatuses = List.of("NEW", "READ");
-        when(privateRepository.findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses))
-                .thenReturn(List.of(privateDocument));
-        when(sharedRepository.findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses))
-                .thenReturn(List.of(sharedDocument));
-        when(mapper.toDomain(privateDocument)).thenReturn(privateNote);
-        when(mapper.toDomain(sharedDocument)).thenReturn(sharedNote);
-
-        List<Note> result = repository.findActiveByOwner("507f1f77bcf86cd799439012");
-
-        assertEquals(List.of(privateNote, sharedNote), result);
-        verify(privateRepository).findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses);
-        verify(sharedRepository).findAllByOwnerIdAndStatusIn("507f1f77bcf86cd799439012", visibleStatuses);
-        verify(sharedRepository).findAllByStatusInAndSharedWith(visibleStatuses, "507f1f77bcf86cd799439012");
+        String json = query.getQueryObject().toJson();
+        assertTrue(json.contains("\"_class\": \"shared\""), json);
+        assertTrue(json.contains("\"sharedWith\": \"" + RECIPIENT_ID + "\""), json);
+        assertTrue(json.contains("\"NEW\"") && json.contains("\"READ\""), json);
     }
 
     @Test
     @Timeout(1)
-    @Tag("mongoGetNoteRepository")
-    void shouldFindActiveSharedNotesByRecipient() {
-        SharedNoteDocument document = sharedDocument();
-        Note note = sharedNote();
+    @Tag("mongoListNoteRepository")
+    void sortsPinnedFirstThenNewestFirst() {
+        Query query = captureListing(() -> repository.findActiveByOwner(OWNER_ID, PageQuery.unpaged()));
 
-        when(sharedRepository.findAllByStatusInAndSharedWith(List.of("NEW", "READ"), "507f1f77bcf86cd799439013"))
+        assertEquals(new Document("pinned", -1).append("createdAt", -1).append("_id", -1), query.getSortObject());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("mongoListNoteRepository")
+    void appliesSkipAndLimitAndCountsTheTotalForPagedQueries() {
+        PrivateNoteDocument document = (PrivateNoteDocument) mapper.toDocument(privateNote());
+        when(mongoTemplate.find(any(Query.class), eq(NoteDocument.class), eq("notes")))
+                .thenReturn(List.of(document, document));
+        when(mongoTemplate.count(any(Query.class), eq("notes"))).thenReturn(7L);
+
+        NotePage page = repository.findDeletedByOwner(OWNER_ID, new PageQuery(1, 2));
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(query.capture(), eq(NoteDocument.class), eq("notes"));
+        assertEquals(2, query.getValue().getSkip());
+        assertEquals(2, query.getValue().getLimit());
+        assertEquals(2, page.items().size());
+        assertEquals(7, page.totalItems());
+    }
+
+    @Test
+    @Timeout(1)
+    @Tag("mongoListNoteRepository")
+    void skipsTheCountWhenTheFirstPageIsNotFull() {
+        PrivateNoteDocument document = (PrivateNoteDocument) mapper.toDocument(privateNote());
+        when(mongoTemplate.find(any(Query.class), eq(NoteDocument.class), eq("notes")))
                 .thenReturn(List.of(document));
-        when(mapper.toDomain(document)).thenReturn(note);
 
-        List<Note> result = repository.findActiveBySharedWith("507f1f77bcf86cd799439013");
+        NotePage page = repository.findActiveByOwner(OWNER_ID, new PageQuery(0, 20));
 
-        assertEquals(List.of(note), result);
-        verify(sharedRepository).findAllByStatusInAndSharedWith(List.of("NEW", "READ"), "507f1f77bcf86cd799439013");
+        assertEquals(1, page.totalItems());
+        verify(mongoTemplate, never()).count(any(Query.class), eq("notes"));
     }
 
-    @Test
-    @Timeout(1)
-    @Tag("mongoGetNoteRepository")
-    void shouldFindActiveSharedNotesByOwnerAndRecipient() {
-        SharedNoteDocument document = sharedDocument();
-        Note note = sharedNote();
-
-        when(sharedRepository.findAllByStatusInAndOwnerIdAndSharedWith(
-                List.of("NEW", "READ"),
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        )).thenReturn(List.of(document));
-        when(mapper.toDomain(document)).thenReturn(note);
-
-        List<Note> result = repository.findActiveByOwnerAndSharedWith(
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
-
-        assertEquals(List.of(note), result);
-        verify(sharedRepository).findAllByStatusInAndOwnerIdAndSharedWith(
-                List.of("NEW", "READ"),
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoDeleteNoteRepository")
-    void shouldReturnNoteWhenDocumentExistsBeforeDeletion() {
-        PrivateNoteDocument document = new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "NEW",
-                "2026-01-01T10:00:00Z",
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-        Note expectedNote = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.of(document));
-        when(mapper.toDomain(document)).thenReturn(expectedNote);
-
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isPresent());
-        assertEquals(expectedNote, result.get());
-        verify(mapper).toObjectId("507f1f77bcf86cd799439011");
-        verify(baseRepository).findById(objectId);
-        verify(mapper).toDomain(document);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoDeleteNoteRepository")
-    void shouldReturnEmptyWhenDocumentDoesNotExistBeforeDeletion() {
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.empty());
-
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isEmpty());
-        verify(mapper, never()).toDomain(any());
-        verify(baseRepository, never()).save(any());
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoDeleteNoteRepository")
-    void shouldUpdateStatusWhenNoteIsSaved() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-        note.delete();
-
-        PrivateNoteDocument document = (PrivateNoteDocument) new NoteMapper().toDocument(note);
-        when(mapper.toDocument(note)).thenReturn(document);
-
-        repository.save(note);
-
-        assertEquals("DELETED", document.getStatus());
-        verify(baseRepository).save(document);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoDeleteNoteRepository")
-    void shouldInsertNewDocumentWhenSavingMissingNoteBeforeDeletion() {
-        Note note = new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-        note.delete();
-
-        PrivateNoteDocument document = new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "DELETED",
-                note.createdAt().value().toString(),
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-        when(mapper.toDocument(note)).thenReturn(document);
-
-        repository.save(note);
-
-        verify(baseRepository).save(document);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoMarkNoteAsReadRepository")
-    void shouldReturnNoteWhenDocumentExistsBeforeMarkingAsRead() {
-        PrivateNoteDocument document = privateDocument("NEW", null);
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-        Note expectedNote = privateNote();
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.of(document));
-        when(mapper.toDomain(document)).thenReturn(expectedNote);
-
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isPresent());
-        assertEquals(expectedNote, result.get());
-        verify(mapper).toObjectId("507f1f77bcf86cd799439011");
-        verify(baseRepository).findById(objectId);
-        verify(mapper).toDomain(document);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoMarkNoteAsReadRepository")
-    void shouldReturnEmptyWhenDocumentDoesNotExistBeforeMarkingAsRead() {
-        ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
-
-        when(mapper.toObjectId("507f1f77bcf86cd799439011")).thenReturn(objectId);
-        when(baseRepository.findById(objectId)).thenReturn(Optional.empty());
-
-        Optional<Note> result = repository.findById(new NoteId("507f1f77bcf86cd799439011"));
-
-        assertTrue(result.isEmpty());
-        verify(mapper, never()).toDomain(any());
-        verify(baseRepository, never()).save(any());
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoMarkNoteAsReadRepository")
-    void shouldUpdateStatusAndReadAtWhenNoteIsSaved() {
-        Note note = privateNote();
-        note.markAsRead();
-        PrivateNoteDocument document = (PrivateNoteDocument) new NoteMapper().toDocument(note);
-        when(mapper.toDocument(note)).thenReturn(document);
-
-        repository.save(note);
-
-        assertEquals("READ", document.getStatus());
-        assertEquals(note.readAt().value().toString(), document.getReadAt());
-        verify(baseRepository).save(document);
-    }
-
-    @Test
-    @Timeout(1)
-    @Tag("mongoMarkNoteAsReadRepository")
-    void shouldInsertNewDocumentWhenSavingMissingNoteBeforeMarkingAsRead() {
-        Note note = privateNote();
-        note.markAsRead();
-        PrivateNoteDocument document = privateDocument("READ", note.readAt().value().toString());
-        when(mapper.toDocument(note)).thenReturn(document);
-
-        repository.save(note);
-
-        verify(baseRepository).save(document);
+    private Query captureListing(Runnable listing) {
+        when(mongoTemplate.find(any(Query.class), eq(NoteDocument.class), eq("notes"))).thenReturn(List.of());
+        listing.run();
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(query.capture(), eq(NoteDocument.class), eq("notes"));
+        return query.getValue();
     }
 
     private Note privateNote() {
-        return new NoteFactory().createPrivateNote(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-    }
-
-    private Note sharedNote() {
-        return new NoteFactory().createSharedNote(
-                "507f1f77bcf86cd799439014",
-                "Shared",
-                "Body",
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
-    }
-
-    private Note privateNote(String id) {
-        return new NoteFactory().createPrivateNote(
-                id,
-                "Hello",
-                "Body",
-                "507f1f77bcf86cd799439012"
-        );
-    }
-
-    private PrivateNoteDocument privateDocument() {
-        return new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                "NEW",
-                "2026-01-01T10:00:00Z",
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-    }
-
-    private PrivateNoteDocument privateDocument(String status, String readAt) {
-        return new PrivateNoteDocument(
-                "507f1f77bcf86cd799439011",
-                "Hello",
-                "Body",
-                status,
-                "2026-01-01T10:00:00Z",
-                readAt,
-                null,
-                null,
-                "507f1f77bcf86cd799439012"
-        );
-    }
-
-    private SharedNoteDocument sharedDocument() {
-        return new SharedNoteDocument(
-                "507f1f77bcf86cd799439014",
-                "Shared",
-                "Body",
-                "NEW",
-                "2026-01-01T10:00:00Z",
-                null,
-                null,
-                null,
-                "507f1f77bcf86cd799439012",
-                "507f1f77bcf86cd799439013"
-        );
+        return new NoteFactory().createPrivateNote(NOTE_ID, "Hello", "Body", OWNER_ID);
     }
 }

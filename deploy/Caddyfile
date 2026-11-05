@@ -1,4 +1,8 @@
 :80 {
+	request_body {
+		max_size 1MB
+	}
+
 	rate_limit {
 		zone authentication {
 			match {
@@ -7,17 +11,12 @@
 			key {http.request.header.CF-Connecting-IP}
 			events 10
 			window 1m
-			ipv6_prefix 64
 		}
 
 		zone application {
-			match {
-				not path /actuator/health/readiness
-			}
 			key {http.request.header.CF-Connecting-IP}
 			events 300
 			window 1m
-			ipv6_prefix 64
 		}
 	}
 

@@ -34,4 +34,17 @@ class NoteInvariantsTest {
         assertThrows(NoteConflictException.class, () -> note.changeContent("Changed"));
         assertThrows(NoteConflictException.class, () -> note.replaceTags(List.of(new Tag("changed"))));
     }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(1)
+    @org.junit.jupiter.api.Tag("noteVersion")
+    void versionStartsEmptyAndNeverMovesBackwards() {
+        var note = new NoteFactory().createPrivateNote("note-1", "Title", "Body", "owner-1");
+
+        org.junit.jupiter.api.Assertions.assertNull(note.version());
+        note.recordVersion(2);
+        org.junit.jupiter.api.Assertions.assertEquals(2, note.version());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> note.recordVersion(1));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> note.recordVersion(null));
+    }
 }

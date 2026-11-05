@@ -4,6 +4,7 @@ import com.luispiquinrey.backend.account.application.use_cases.RegisterAccountUs
 import com.luispiquinrey.backend.account.application.dto.request.RegisterAccountRequest;
 import com.luispiquinrey.backend.account.presentation.viewmodel.RegisteredAccountViewModel;
 import com.luispiquinrey.backend.account.presentation.presenter.RegisterAccountPresenter;
+import com.luispiquinrey.backend.account.presentation.request.RegisterAccountBody;
 import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
 import com.luispiquinrey.backend.share.result.ApplicationError;
@@ -22,8 +23,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -55,7 +54,7 @@ public class RegisterAccountController {
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = RegisterAccountRequest.class))))
+                            schema = @Schema(implementation = RegisterAccountBody.class))))
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
@@ -77,15 +76,14 @@ public class RegisterAccountController {
                             schema = @Schema(implementation = ErrorViewModel.class)))})
     @PostMapping("/register")
     public ResponseEntity<?> register(
-            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+            @org.springframework.web.bind.annotation.RequestBody RegisterAccountBody body) {
         log.info("Received registration request");
         RegisterAccountRequest input;
         try {
-            input = new RegisterAccountRequest(body.get("email"), body.get("rawPassword"), body.get("rawLockerPassword"));
+            input = new RegisterAccountRequest(body.email(), body.rawPassword(), body.rawLockerPassword());
         } catch (IllegalArgumentException e) {
             return httpResponsePresenter.toHttp(
-                    presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))),
-                    view -> ResponseEntity.status(HttpStatus.CREATED).body(view));
+                    presenter.present(Result.failure(ApplicationError.validationError(e.getMessage()))));
         }
         return httpResponsePresenter.toHttp(
                 presenter.present(registerAccountUseCase.register(input)),

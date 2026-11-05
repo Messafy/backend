@@ -6,12 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
-import io.jsonwebtoken.JwtException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -53,10 +53,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             authenticate(jwt, request);
-        } catch (JwtException | IllegalArgumentException | AuthenticationException exception) {
+        } catch (IllegalArgumentException | AuthenticationException exception) {
             SecurityContextHolder.clearContext();
             log.debug("JWT authentication failed");
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            SecurityProblemResponses.write(response, HttpStatus.UNAUTHORIZED, "invalid bearer token");
             return;
         }
         filterChain.doFilter(request, response);
@@ -77,17 +77,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String userEmail = jwtTokenVerifier.extractEmail(jwt);
-        if (userEmail == null || userEmail.isBlank()) {
-            throw new BadCredentialsException("invalid bearer token");
-        }
+        String userEmail = jwtTokenVerifier.verifyAccessToken(jwt)
+                .orElseThrow(() -> new BadCredentialsException("invalid bearer token"));
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
         new AccountStatusUserDetailsChecker().check(userDetails);
-
-        if (!jwtTokenVerifier.isTokenValid(jwt, userDetails)) {
-            throw new BadCredentialsException("invalid bearer token");
-        }
 
         setAuthentication(userDetails, request);
         log.debug("Authenticated user {} via JWT", userDetails.getUsername());

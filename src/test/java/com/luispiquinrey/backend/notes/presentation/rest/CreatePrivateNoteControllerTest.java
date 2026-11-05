@@ -1,5 +1,6 @@
 package com.luispiquinrey.backend.notes.presentation.rest;
 
+import org.springframework.http.ProblemDetail;
 import com.luispiquinrey.backend.notes.application.dto.response.CreatedNoteResponse;
 import com.luispiquinrey.backend.notes.application.port.CreatePrivateNotePort;
 import com.luispiquinrey.backend.notes.presentation.presenter.CreatePrivateNotePresenter;
@@ -7,7 +8,6 @@ import com.luispiquinrey.backend.notes.presentation.viewmodel.CreatePrivateNoteV
 import com.luispiquinrey.backend.share.identity.AuthenticatedUser;
 import com.luispiquinrey.backend.share.presentation.ErrorPresenter;
 import com.luispiquinrey.backend.share.presentation.HttpResponsePresenter;
-import com.luispiquinrey.backend.share.presentation.ErrorViewModel;
 import com.luispiquinrey.backend.share.result.ApplicationError;
 import com.luispiquinrey.backend.share.result.Result;
 import org.junit.jupiter.api.Tag;
@@ -59,7 +59,7 @@ class CreatePrivateNoteControllerTest {
         var response = controller.createPrivateNote(Map.of("title", " ", "content", "Content"), USER);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("VALIDATION_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("VALIDATION_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
         verify(useCase, never()).create(any());
     }
 
@@ -71,7 +71,7 @@ class CreatePrivateNoteControllerTest {
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals("title must be a string",
-                assertInstanceOf(ErrorViewModel.class, response.getBody()).message());
+                assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("message"));
     }
 
     @Test
@@ -83,6 +83,6 @@ class CreatePrivateNoteControllerTest {
         var response = controller.createPrivateNote(Map.of("title", "Title", "content", "Content"), USER);
 
         assertEquals(409, response.getStatusCode().value());
-        assertEquals("CONFLICT_ERROR", assertInstanceOf(ErrorViewModel.class, response.getBody()).code());
+        assertEquals("CONFLICT_ERROR", assertInstanceOf(ProblemDetail.class, response.getBody()).getProperties().get("code"));
     }
 }
